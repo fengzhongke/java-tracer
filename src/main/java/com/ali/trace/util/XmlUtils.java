@@ -145,7 +145,10 @@ public class XmlUtils {
 			writer = new BufferedWriter(new FileWriter(reverseFile));
 			String line = null;
 			while ((line = reader.readLine()) != null) {
-				writer.write(line);
+				if(line != null && !"".equals(line.trim())){
+					writer.write(line);
+					writer.write("\r\n");
+				}
 			}
 		} finally {
 			if (reader != null) {
@@ -235,8 +238,7 @@ public class XmlUtils {
 					buf = channel.map(FileChannel.MapMode.READ_ONLY, start, len);
 					bufPos = (int) len;
 					filePos = start;
-
-					c = buf.get(bufPos);
+					c = buf.get(--bufPos);
 					Byte preC = null;
 					if (c == '\r' || c == '\n') {
 						while (bufPos > 0 && (c == '\r' || c == '\n')) {
