@@ -52,9 +52,10 @@ public class Premain {
 			int idx = params.lastIndexOf(".");
 			String c = params.substring(0, idx);
 			String m = params.substring(idx + 1);
-			TraceEnhance.setIntecepter(new ThreadIntercepter(path, c, m));
+			TraceEnhance.setIntecepter(new ThreadIntercepter(path, true,  c, m));
 		} else {
-			TraceEnhance.setIntecepter(new CommonIntercepter(path));
+			boolean printTime = Boolean.valueOf(args);
+			TraceEnhance.setIntecepter(new CommonIntercepter(path, printTime));
 		}
 		inst.addTransformer(new TraceTransformer(), true);
 	}

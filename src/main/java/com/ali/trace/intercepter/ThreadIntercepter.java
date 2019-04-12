@@ -6,8 +6,8 @@ public class ThreadIntercepter extends CommonIntercepter {
 	private String m;
 	private final ThreadLocal<Integer> t_stack = new ThreadLocal<Integer>();
 
-	public ThreadIntercepter(String path, String c, String m) {
-		super(path);
+	public ThreadIntercepter(String path, boolean printTime, String c, String m) {
+		super(path, printTime);
 		this.c = c;
 		this.m = m;
 	}
@@ -15,7 +15,7 @@ public class ThreadIntercepter extends CommonIntercepter {
 	@Override
 	public void start(String c, String m) {
 		Integer stack = t_stack.get();
-		if (c.equalsIgnoreCase(this.c) && m.equalsIgnoreCase(this.m)) {
+		if (c.startsWith(this.c) && m.equalsIgnoreCase(this.m)) {
 			if (stack == null) {
 				t_stack.set(stack = 1);
 			} else {

@@ -144,7 +144,7 @@ public class CompressIntercepter extends BaseIntercepter {
 		public StringBuilder printPre() {
 			StringBuilder sb = new StringBuilder();
 			if (print == 0) {
-				sb.append("<").append(method).append(" c='").append(clasz.substring(clasz.lastIndexOf(".") + 1))
+				sb.append("<").append(method).append(" c='").append(clasz)
 						.append("'>\r\n").toString();
 				print = 1;
 				if (isRef == 2) {

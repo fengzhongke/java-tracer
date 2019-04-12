@@ -30,14 +30,16 @@ public class CommonIntercepter extends BaseIntercepter {
 				try {
 					INFO_MAP.put((Character) field.get(null), field.getName());
 				} catch (Exception e) {
-					e.printStackTrace();
+					//e.printStackTrace();
 				}
 			}
 		}
 	}
 
-	public CommonIntercepter(String path) {
+	private final boolean printTime;
+	public CommonIntercepter(String path, boolean printTime) {
 		super(path);
+		this.printTime = printTime;
 	}
 
 	@Override
@@ -52,11 +54,17 @@ public class CommonIntercepter extends BaseIntercepter {
 				sb = new StringBuilder(64).append('<').append(m);
 				stack.set(s + 1);
 			}
-			printTime(printDepth(printLine(sb)));
+
+			printDepth(printLine(sb));
+
+	        long t = System.currentTimeMillis() - start;
+			if(printTime){
+				printTime(sb, t);
+			}
 			sb.append(" ").append(CLASS_NAME).append("='").append(c).append('\'').append(">\r\n");
 
 			write(sb.toString());
-			Piece piece = new Piece(c, m, 0L);
+			Piece piece = new Piece(c, m, t);
 			prePiece.set(piece);
 			if (!pieceStacks.get().isEmpty()) {
 				Piece superPiece = pieceStacks.get().peek();
@@ -64,7 +72,7 @@ public class CommonIntercepter extends BaseIntercepter {
 			}
 			pieceStacks.get().push(piece);
 		} catch (Throwable t) {
-			t.printStackTrace();
+			//t.printStackTrace();
 		}
 	}
 
@@ -80,7 +88,10 @@ public class CommonIntercepter extends BaseIntercepter {
 			}
 
 			StringBuilder sb = new StringBuilder("</").append(m);
-			printSons(printCost(sb, piece), piece);
+			printCost(sb, piece);
+			if(printTime){
+				printSons(sb, piece);
+			}
 			sb.append(">\r\n");
 			write(sb.toString());
 		} catch (Throwable t) {
@@ -101,8 +112,7 @@ public class CommonIntercepter extends BaseIntercepter {
 		return sb;
 	}
 
-	long printTime(StringBuilder sb) {
-		long t = System.currentTimeMillis() - start;
+	long printTime(StringBuilder sb, long t) {
 		preTime.set(t);
 		sb.append(" ").append(TIME_OFF_START).append("='").append(t).append('\'');
 		return t;
