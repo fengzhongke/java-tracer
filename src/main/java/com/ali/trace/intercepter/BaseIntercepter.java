@@ -19,7 +19,11 @@ public abstract class BaseIntercepter implements IIntercepter {
 	private IFileNameGenerator nameGenerator;
 
 	public BaseIntercepter(String path) {
-		this.path = path;
+	    if(path != null){
+	        this.path = path;
+	    }else{
+	        this.path = "/tmp/";
+	    }
 	}
 
 	public void setNameGenerator(IFileNameGenerator nameGenerator) {

@@ -20,5 +20,6 @@ public class MainProcess {
 	
 	public static void print(){
 		System.out.println("externer call time is " + new SimpleDateFormat(DATE_FORMAT).format(new Date()));
+        throw new RuntimeException("s");
 	}
 }

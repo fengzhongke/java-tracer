@@ -27,6 +27,7 @@
 						</manifest>
 						<manifestEntries>
 							<Premain-Class>com.ali.trace.main.Premain</Premain-Class>
+							<Agent-Class>com.ali.trace.main.Premain</Agent-Class>
 							<Main-Class>com.ali.trace.util.XmlUtils</Main-Class>
 							<Can-Redefine-Classes>true</Can-Redefine-Classes>
 							<Can-Retransform-Classes>true</Can-Retransform-Classes>

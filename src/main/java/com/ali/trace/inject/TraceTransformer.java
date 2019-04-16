@@ -12,11 +12,11 @@ public class TraceTransformer implements ClassFileTransformer {
 				&& !className.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")) {
 //		if(loader != null){
 			try {
-				classfileBuffer = new TraceInjecter(classfileBuffer).getBytes();
+				classfileBuffer = new TraceInjecter(classfileBuffer, loader).getBytes();
 				transform = true;
 			} catch (Exception e) {
-				System.err.print("error " + className);
-				e.printStackTrace();
+				System.err.println("error " + className);
+				//e.printStackTrace();
 			}
 		}
 		System.out.println("class:[" + className + "," + classBeingRedefined + "],transform:[" + transform + "]");
