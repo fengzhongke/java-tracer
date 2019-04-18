@@ -35,7 +35,7 @@ public class TreeNode {
         this.id = id;
     }
 
-    public TreeNode addSon(long id) {
+    public TreeNode addSon(long id, long cnt) {
         TreeNode son = sons.get(id);
         if (son == null) {
             TreeNode oldSon = sons.putIfAbsent(id, son = new TreeNode(id));
@@ -43,11 +43,11 @@ public class TreeNode {
                 son = oldSon;
             }
         }
-        son.cnt++;
+        son.cnt += cnt;
         return son;
     }
-    
-    public void addRt(long rt){
+
+    public void addRt(long rt) {
         this.totalRt += rt;
     }
 
@@ -59,6 +59,15 @@ public class TreeNode {
         return totalRt;
     }
 
+
+
+    public boolean equal(String service, String method) {
+        return getId(service, method) == id;
+    }
+    
+    public String getName(){
+        return nameMap.get(id);
+    }
     public void writeFile(Writer writer) throws IOException {
         String name = nameMap.get(id);
         if (name == null) {
@@ -82,11 +91,11 @@ public class TreeNode {
     public static void main(String[] args) throws IOException {
         long id = TreeNode.getId("com.test.Service", "main");
         TreeNode node = new TreeNode(id);
-        node.addSon(TreeNode.getId("com.test.Service", "main1"));
-        node.addSon(TreeNode.getId("com.test.Service1", "main"));
-        node.addSon(TreeNode.getId("com.test.Service1", "main"));
-        node.addSon(TreeNode.getId("com.test.Service1", "main"));
-        node.addSon(TreeNode.getId("com.test.Service", "main"));
+        node.addSon(TreeNode.getId("com.test.Service", "main1"), 1L);
+        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
+        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
+        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
+        node.addSon(TreeNode.getId("com.test.Service", "main"), 1L);
         BufferedWriter writer = null;
         try {
             writer = new BufferedWriter(new FileWriter("/tmp/test.xml"));

@@ -8,6 +8,7 @@ import com.ali.trace.inject.TraceEnhance;
 import com.ali.trace.inject.TraceTransformer;
 import com.ali.trace.intercepter.CommonIntercepter;
 import com.ali.trace.intercepter.CompressIntercepter;
+import com.ali.trace.intercepter.ThreadCompressIntercepter;
 import com.ali.trace.intercepter.ThreadIntercepter;
 
 public class CoreEngine {
@@ -21,15 +22,14 @@ public class CoreEngine {
     private static TraceTransformer transformer = new TraceTransformer();
 
     public static void process(String args, Instrumentation inst) {
-        System.out.println("args : " + args);
         String path = null;
         String intercepter = null;
         Map<String, String> map = new HashMap<String, String>();
         if (args != null) {
-            String[] items = args.split("&");
+            String[] items = args.split("#");
             for (String item : items) {
                 String[] keyVal = item.split(":");
-                if(keyVal.length == 2){
+                if (keyVal.length == 2) {
                     map.put(keyVal[0], keyVal[1]);
                 }
             }
@@ -38,6 +38,11 @@ public class CoreEngine {
         path = map.get(PATH);
         if ("compress".equalsIgnoreCase(intercepter)) {
             TraceEnhance.setIntecepter(new CompressIntercepter(path));
+        } else if ("stastic".equals(intercepter)) {
+            String clasz = map.get(CLASS);
+            String method = map.get(METHOD);
+            System.out.println("class:[" + clasz + "]method:[" + method + "]");
+            TraceEnhance.setIntecepter(new ThreadCompressIntercepter(path, clasz, method));
         } else if ("thread".equals(intercepter)) {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);
@@ -49,10 +54,10 @@ public class CoreEngine {
         }
         String online = map.get(ONLINE);
         System.out.println("map:" + map);
-        if(Boolean.valueOf(online)){
+        if (Boolean.valueOf(online)) {
             System.out.println("online transformer");
             inst.addTransformer(transformer, true);
-        }else{
+        } else {
             System.out.println("offline transformer");
             inst.removeTransformer(transformer);
         }

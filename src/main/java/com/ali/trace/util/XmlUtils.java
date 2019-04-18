@@ -100,7 +100,7 @@ public class XmlUtils {
                         } else {
                             String c = items[items.length - 2];
                             cs.push(c);
-                            stack.push(stack.peek().addSon(TreeNode.getId(c, m)));
+                            stack.push(stack.peek().addSon(TreeNode.getId(c, m), 1L));
                         }
                     }
                 }

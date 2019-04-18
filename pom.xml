@@ -31,6 +31,7 @@
 							<Main-Class>com.ali.trace.util.XmlUtils</Main-Class>
 							<Can-Redefine-Classes>true</Can-Redefine-Classes>
 							<Can-Retransform-Classes>true</Can-Retransform-Classes>
+							<Boot-Class-Path>java-tracer.jar</Boot-Class-Path>
 						</manifestEntries>
 					</archive>
 				</configuration>
