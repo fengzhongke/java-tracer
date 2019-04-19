@@ -32,7 +32,6 @@ public class Premain {
 
     public static void premain(String args, Instrumentation inst) {
         System.out.println("Premain loader : " + Premain.class.getClassLoader());
-        new Throwable().printStackTrace();
         CoreEngine.process(args, inst);
     }
 
@@ -54,25 +53,5 @@ public class Premain {
             }
         }
     }
-//
-//    private static void process(String args, Instrumentation inst) {
-//        try {
-//            URL res = Premain.class.getResource("Premain.class");
-//            String file = res.getFile();
-//            int from = file.indexOf(":");
-//            int to = file.indexOf("!");
-//            if (from > -1 && to > -1) {
-//                file = file.substring(from + 1, to);
-//            }
-//            inst.appendToBootstrapClassLoaderSearch(new JarFile(new File(file)));
-//            System.out.println("jar is :" + file);
-//
-//            Class<?> clasz = Class.forName("com.ali.trace.main.CoreEngine");
-//            Method method = clasz.getDeclaredMethod("process", new Class<?>[] {String.class, Instrumentation.class});
-//            method.invoke(null, args, inst);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
 
 }

@@ -37,7 +37,7 @@ public class AttackEngine {
         }
         tool = "file:" + tool;
         if(params == null){
-            params = "intercepter:thread&class:com.hema.sre.pool.service.SqlService&method:exec&online:true";
+            params = "intercepter:thread#class:com.hema.sre.pool.service.SqlService#method:exec#online:true";
         }
         
         Class<?> clasz = null;
