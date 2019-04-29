@@ -17,16 +17,16 @@ import com.ali.dbtech.test.AsmTest.MyClassVisitor.MethodInfo;
 public class AsmTest {
 
     public static void main(String[] args) throws FileNotFoundException, IOException {
-MyClassVisitor visitor = new MyClassVisitor(AsmTest.class.getName());
-for (MethodInfo method : visitor.getMethods()) {
-    System.out.println("Title: invokes of " + method.getClasz() + ":" + method.getMethod());
-    for (MethodInfo invoke : method.getInvoke()) {
-        if (!invoke.getClasz().startsWith("java.")) {
-            System.out.println(method.getClasz() + "->" + invoke.getClasz() + ":" + invoke.getMethod());
+        MyClassVisitor visitor = new MyClassVisitor(AsmTest.class.getName());
+        for (MethodInfo method : visitor.getMethods()) {
+            System.out.println("Title: invokes of " + method.getClasz() + ":" + method.getMethod());
+            for (MethodInfo invoke : method.getInvoke()) {
+                if (!invoke.getClasz().startsWith("java.")) {
+                    System.out.println(method.getClasz() + "->" + invoke.getClasz() + ":" + invoke.getMethod());
+                }
+            }
+            System.out.println();
         }
-    }
-    System.out.println();
-}
 
     }
 

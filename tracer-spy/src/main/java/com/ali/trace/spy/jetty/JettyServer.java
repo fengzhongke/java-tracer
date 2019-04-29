@@ -33,7 +33,7 @@ public class JettyServer {
         final String pathSpec = "/*";
         context.addServlet(new ServletHolder(new ModuleHttpServlet()), pathSpec);
 
-        Server httpServer = new Server(new InetSocketAddress("127.0.0.1", port));
+        Server httpServer = new Server(new InetSocketAddress(port));
         if (httpServer.getThreadPool() instanceof QueuedThreadPool) {
             final QueuedThreadPool qtp = (QueuedThreadPool)httpServer.getThreadPool();
             qtp.setName("tracer-jetty-qtp" + qtp.hashCode());

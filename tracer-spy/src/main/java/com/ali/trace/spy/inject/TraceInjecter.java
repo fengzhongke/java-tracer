@@ -59,6 +59,9 @@ public class TraceInjecter {
 
                 @Override
                 protected String getCommonSuperClass(final String type1, final String type2) {
+                    if(type1.equals("com/hema/sre/pool/exception/TestException") || type2.equals("com/hema/sre/pool/exception/TestException")){
+                        return super.getCommonSuperClass(type1, type2);
+                    }
                     if (name.equals(type1)) {
                         // return "java/lang/Object";
                         throw new TypeNotPresentException(type1,
