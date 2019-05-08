@@ -1,6 +1,5 @@
 package com.ali.trace.spy.intercepter;
 
-import java.io.Writer;
 import java.util.Stack;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +32,7 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
     public void start(String c, String m) {
         Stack<TreeNode> stack = t_stack.get();
         Stack<Long> time = t_time.get();
-        if (c.startsWith(this.c) && m.equalsIgnoreCase(this.m)) {
+        if (c.equalsIgnoreCase(this.c) && m.equalsIgnoreCase(this.m)) {
             if (stack == null) {
                 t_stack.set(stack = new Stack<TreeNode>());
                 stack.add(new TreeNode(TreeNode.getId(c, m)));
@@ -53,7 +52,7 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
         Stack<TreeNode> stack = t_stack.get();
         Stack<Long> time = t_time.get();
         TreeNode node = null;
-        if (stack != null && stack.size() > 0) {
+        if (stack != null && !stack.isEmpty()) {
             node = stack.pop();
             node.addRt(System.currentTimeMillis() - time.pop());
             if (!node.equal(c, m)) {
@@ -61,13 +60,6 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
             }
         }
         if (stack != null && stack.isEmpty()) {
-//            try {
-//                Writer out = getWriter();
-//                node.writeFile(out);
-//                out.flush();
-//            } catch (Throwable t) {
-//                t.printStackTrace();
-//            }
             queue.offer(node);
             t_stack.set(null);
             t_time.set(null);

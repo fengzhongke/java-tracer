@@ -30,7 +30,7 @@ public class TraceInjecter {
 
         Integer type = 0;
         try {
-            if (loader != null && name != null && loader != getClass().getClassLoader()) {
+            if ((loader != null && name != null && loader != getClass().getClassLoader() && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")) || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
                 bytes = new CodeReader(loader, name, bytes).getBytes();
                 type = 1;
             }

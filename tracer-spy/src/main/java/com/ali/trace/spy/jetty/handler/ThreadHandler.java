@@ -134,7 +134,7 @@ public class ThreadHandler extends ITracerHttpHandler {
                     return o2.cnt - o1.cnt;
                 }
             });
-            return children.values();
+            return sons;
         }
 
     }

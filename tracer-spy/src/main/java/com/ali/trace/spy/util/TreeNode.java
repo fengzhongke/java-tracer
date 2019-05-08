@@ -7,6 +7,7 @@ import java.io.Writer;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class TreeNode {
 
@@ -14,17 +15,26 @@ public class TreeNode {
     private long cnt;
     private long totalRt;
     private Map<Long, TreeNode> sons = new LinkedHashMap<Long, TreeNode>();
-    private static Map<String, Long> idMap = new HashMap<String, Long>();
-    private static Map<Long, String> nameMap = new HashMap<Long, String>();
+    private static AtomicLong seq = new AtomicLong(0);
+    private static Map<String, Map<String, Long>> idMap = new HashMap<String, Map<String, Long>>();
+    private static Map<Long, String[]> nameMap = new HashMap<Long, String[]>();
 
     public static long getId(String service, String method) {
-        Long id = null;
-        String name = service + "#" + method;
-        if ((id = idMap.get(name)) == null) {
+        Map<String, Long> cMap = null;
+        if ((cMap = idMap.get(service)) == null) {
             synchronized (idMap) {
-                if ((id = idMap.get(name)) == null) {
-                    idMap.put(name, id = idMap.size() + 1L);
-                    nameMap.put(id, name);
+                if ((cMap = idMap.get(service)) == null) {
+                    idMap.put(service, cMap = new HashMap<String, Long>());
+                }
+            }
+        }
+
+        Long id = null;
+        if ((id = cMap.get(method)) == null) {
+            synchronized (cMap) {
+                if ((id = cMap.get(method)) == null) {
+                    cMap.put(method, id = seq.incrementAndGet());
+                    nameMap.put(id, new String[] {service, method});
                 }
             }
         }
@@ -60,16 +70,15 @@ public class TreeNode {
         return getId(service, method) == id;
     }
 
-    public String getName() {
+    public String[] getName() {
         return nameMap.get(id);
     }
 
     public void writeFile(Writer writer) throws IOException {
-        String name = nameMap.get(id);
-        if (name == null) {
+        String[] items = nameMap.get(id);
+        if (items == null) {
             throw new RuntimeException("name not exists ![" + id + "]");
         }
-        String[] items = name.split("#");
         writer.write("<");
         writer.write(items[1]);
         writer.write(" cnt='" + cnt + "'");
