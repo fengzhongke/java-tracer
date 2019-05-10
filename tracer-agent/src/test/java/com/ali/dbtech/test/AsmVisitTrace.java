@@ -9,12 +9,13 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
+
 public class AsmVisitTrace {
 
     public static void main(String[] args) throws FileNotFoundException, IOException {
-
-        String name = Test.class.getName();
-        new Test();
+//
+//        String name = Test.class.getName();
+//        new Test();
         Scanner scanner = new Scanner(System.in);
         String line = null;
         //test(name);
