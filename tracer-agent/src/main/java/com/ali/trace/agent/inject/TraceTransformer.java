@@ -19,7 +19,7 @@ public class TraceTransformer implements ClassFileTransformer {
         try {
             classfileBuffer = (byte[])GET_BYTES.invoke(INJECTER, loader, className, classfileBuffer);
         } catch (Throwable e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
         return classfileBuffer;
     }
