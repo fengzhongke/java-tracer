@@ -17,20 +17,6 @@
 			<groupId>java-tracer</groupId>
 			<artifactId>tracer-spy</artifactId>
 		</dependency>
-
-		<!-- asm -->
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm-commons</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.ow2.asm</groupId>
-			<artifactId>asm-util</artifactId>
-		</dependency>
 	</dependencies>
 
 	<build>
@@ -70,7 +56,7 @@
 						<manifestEntries>
 							<Premain-Class>com.ali.trace.agent.main.Premain</Premain-Class>
 							<Agent-Class>com.ali.trace.agent.main.Premain</Agent-Class>
-							<Main-Class>com.ali.trace.agent.util.XmlUtils</Main-Class>
+							<Main-Class>com.ali.trace.spy.util.XmlUtils</Main-Class>
 							<Can-Redefine-Classes>true</Can-Redefine-Classes>
 							<Can-Retransform-Classes>true</Can-Retransform-Classes>
 							<Boot-Class-Path>java-tracer.jar</Boot-Class-Path>

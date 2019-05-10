@@ -6,20 +6,20 @@ import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 
 public class TraceTransformer implements ClassFileTransformer {
-    Object injecter;
-    Method getBytes;
+    final Object INJECTER;
+    final Method GET_BYTES;
 
     public TraceTransformer(Object injecter) throws SecurityException, NoSuchMethodException {
-        this.injecter = injecter;
-        this.getBytes = injecter.getClass().getMethod("getBytes", ClassLoader.class, String.class, byte[].class);
+        INJECTER = injecter;
+        GET_BYTES = injecter.getClass().getMethod("getBytes", ClassLoader.class, String.class, byte[].class);
     }
 
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
         ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
         try {
-            classfileBuffer = (byte[])getBytes.invoke(injecter, loader, className, classfileBuffer);
+            classfileBuffer = (byte[])GET_BYTES.invoke(INJECTER, loader, className, classfileBuffer);
         } catch (Throwable e) {
-            //e.printStackTrace();
+            e.printStackTrace();
         }
         return classfileBuffer;
     }

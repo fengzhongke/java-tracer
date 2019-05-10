@@ -8,7 +8,10 @@ public class TraceEnhance {
      * inner intercepter
      */
     private static volatile Intercepter intercepter;
-    
+
+    /**
+     * to avoid 
+     */
     private static final ThreadLocal<Boolean> IN = new ThreadLocal<Boolean>();
 
     /**
@@ -18,11 +21,7 @@ public class TraceEnhance {
         boolean set = false;
         if (instance != null) {
             try {
-                Intercepter intercepter = new Intercepter();
-                intercepter.instance = instance;
-                intercepter.start = instance.getClass().getMethod("start", String.class, String.class);
-                intercepter.end = instance.getClass().getMethod("end", String.class, String.class);
-                TraceEnhance.intercepter = intercepter;
+                TraceEnhance.intercepter = new Intercepter(instance);
                 set = true;
             } catch (Throwable e) {
                 e.printStackTrace();
@@ -40,9 +39,9 @@ public class TraceEnhance {
      */
     public static final void s(String c, String m) {
         try {
-            if (IN.get() == null && intercepter != null) {
+            if (intercepter != null && IN.get() == null) {
                 IN.set(true);
-                intercepter.start.invoke(intercepter.instance, c, m);
+                intercepter.START.invoke(intercepter.INSTANCE, c, m);
                 IN.set(null);
             }
         } catch (Throwable t) {
@@ -55,9 +54,9 @@ public class TraceEnhance {
      */
     public static final void e(String c, String m) {
         try {
-            if (IN.get() == null && intercepter != null) {
+            if (intercepter != null && IN.get() == null) {
                 IN.set(true);
-                intercepter.end.invoke(intercepter.instance, c, m);
+                intercepter.END.invoke(intercepter.INSTANCE, c, m);
                 IN.set(null);
             }
         } catch (Throwable t) {
@@ -65,10 +64,17 @@ public class TraceEnhance {
         }
     }
 
-    static class Intercepter {
-        Object instance;
-        Method start;
-        Method end;
+    private static class Intercepter {
+        final Object INSTANCE;
+        final Method START;
+        final Method END;
+
+        Intercepter(Object instance) throws Exception {
+            INSTANCE = instance;
+            Class<?> clazz = instance.getClass();
+            START = clazz.getMethod("start", String.class, String.class);
+            END = clazz.getMethod("end", String.class, String.class);
+        }
     }
 
 }

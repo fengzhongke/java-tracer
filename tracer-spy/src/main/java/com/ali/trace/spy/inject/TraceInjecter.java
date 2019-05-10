@@ -13,26 +13,37 @@ import org.objectweb.asm.commons.Method;
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.jetty.JettyServer;
 
+/**
+ * trace code inject
+ * 
+ * @author hanlang.hl
+ *
+ */
 public class TraceInjecter {
-    private Type type;
-    private Method start;
-    private Method end;
+    private final ClassLoader LOADER;
+    private final Type TYPE;
+    private final Method START;
+    private final Method END;
 
     public TraceInjecter(Class<?> clasz, int port) throws NoSuchMethodException, SecurityException {
-        type = Type.getType(clasz);
-        start = Method.getMethod(clasz.getMethod("s", new Class<?>[] {String.class, String.class}));
-        end = Method.getMethod(clasz.getMethod("e", new Class<?>[] {String.class, String.class}));
+        LOADER = getClass().getClassLoader();
+        TYPE = Type.getType(clasz);
+        START = Method.getMethod(clasz.getMethod("s", new Class<?>[] {String.class, String.class}));
+        END = Method.getMethod(clasz.getMethod("e", new Class<?>[] {String.class, String.class}));
         ConfigPool.getPool().setWeaveClass(clasz);
         new JettyServer(port);
     }
 
     public byte[] getBytes(final ClassLoader loader, final String name, byte[] bytes) throws Throwable {
-
         Integer type = 0;
         try {
-            if ((loader != null && name != null && loader != getClass().getClassLoader() && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")) || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
-                bytes = new CodeReader(loader, name, bytes).getBytes();
-                type = 1;
+            if (name != null) {
+                if ((loader != null && loader != LOADER
+                    && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer"))
+                    || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
+                    bytes = new CodeReader(loader, name, bytes).getBytes();
+                    type = 1;
+                }
             }
             return bytes;
         } catch (Throwable t) {
@@ -46,7 +57,7 @@ public class TraceInjecter {
     }
 
     class CodeReader extends ClassReader {
-        private ClassWriter classWriter;
+        private final ClassWriter classWriter;
 
         public CodeReader(final ClassLoader loader, final String name, byte[] bytes) {
             super(bytes);
@@ -59,18 +70,13 @@ public class TraceInjecter {
 
                 @Override
                 protected String getCommonSuperClass(final String type1, final String type2) {
-                    if(type1.equals("com/hema/sre/pool/exception/TestException") || type2.equals("com/hema/sre/pool/exception/TestException")){
-                        return super.getCommonSuperClass(type1, type2);
-                    }
                     if (name.equals(type1)) {
-                        // return "java/lang/Object";
                         throw new TypeNotPresentException(type1,
-                            new Exception("circular define:[" + type1 + "," + type2 + "]"));
+                            new Exception("circular define 1:[" + type1 + "," + type2 + "]"));
                     }
                     if (name.equals(type2)) {
-                        // return "java/lang/Object";
                         throw new TypeNotPresentException(type2,
-                            new Exception("circular define:[" + type1 + "," + type2 + "]"));
+                            new Exception("circular define 2:[" + type1 + "," + type2 + "]"));
                     }
                     return super.getCommonSuperClass(type1, type2);
                 }
@@ -78,11 +84,20 @@ public class TraceInjecter {
             accept(new CodeVisitor(classWriter), EXPAND_FRAMES);
         }
 
+        /**
+         * return modified bytes
+         */
         public byte[] getBytes() {
             return classWriter.toByteArray();
         }
     }
 
+    /**
+     * weave code before and after each method
+     * 
+     * @author hanlang.hl
+     *
+     */
     class CodeVisitor extends ClassVisitor {
         private String cName;
 
@@ -106,42 +121,44 @@ public class TraceInjecter {
         }
 
         class FinallyAdapter extends AdviceAdapter {
-            private String name;
+            private String mName;
             private Label startFinally = new Label();
             private Label endFinally = new Label();
 
             public FinallyAdapter(MethodVisitor methodVisitor, int acc, String name, String desc) {
                 super(Opcodes.ASM7, methodVisitor, acc, name, desc);
-                this.name = name.replaceAll("<|>|\\$", "");
+                this.mName = name.replaceAll("<|>|\\$", "");
             }
 
             @Override
             protected void onMethodEnter() {
                 push(cName);
-                push(name);
-                invokeStatic(type, start);
+                push(mName);
+                invokeStatic(TYPE, START);
                 mark(startFinally);
             }
 
+            @Override
             public void visitMaxs(int maxStack, int maxLocals) {
                 mark(endFinally);
                 visitTryCatchBlock(startFinally, endFinally, mark(), null);
-                onFinally(ATHROW);
+                onFinally();
                 dup();
                 throwException();
                 super.visitMaxs(maxStack, maxLocals);
             }
 
+            @Override
             protected void onMethodExit(int opcode) {
                 if (opcode != ATHROW) {
-                    onFinally(opcode);
+                    onFinally();
                 }
             }
 
-            private void onFinally(int opcode) {
+            private void onFinally() {
                 push(cName);
-                push(name);
-                invokeStatic(type, end);
+                push(mName);
+                invokeStatic(TYPE, END);
             }
         }
     }

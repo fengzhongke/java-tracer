@@ -26,10 +26,12 @@ public class Premain {
     private static final SpyClassLoader LOADER = new SpyClassLoader(ClassLoader.getSystemClassLoader());
     private static final String SPY_CLASS = "com.ali.trace.spy.inject.TraceInjecter";
     private static final AtomicReference<Object> INJECT = new AtomicReference<Object>();
+    // default port opened by JETTY
+    private static final int DEFAULT_PORT = 18902;
 
     public static void premain(String args, Instrumentation inst) {
-        int port = 18902;
-        if(args != null){
+        int port = DEFAULT_PORT;
+        if (args != null) {
             port = Integer.valueOf(args);
         }
         System.out.println("init trace agent with port [" + port + "]");
@@ -42,9 +44,11 @@ public class Premain {
         } catch (Throwable t) {
             t.printStackTrace();
         }
-
     }
 
+    /**
+     * agent loaded by bootstrap loader, spy and all dependent jars loaded by spy loader
+     */
     private static Object loadSpyJar(int port) {
         Object inject = null;
         if ((inject = INJECT.get()) == null) {
@@ -69,7 +73,7 @@ public class Premain {
                                         bytes.write(data, 0, chunk);
                                     }
                                     data = bytes.toByteArray();
-                                    LOADER.loadSource(new ByteArrayInputStream(data, 0, data.length));
+                                    LOADER.load(new ByteArrayInputStream(data, 0, data.length));
                                 }
                             }
                         } catch (Exception e) {
@@ -84,7 +88,8 @@ public class Premain {
                             }
                         }
                         Class<?> injectClass = LOADER.loadClass(SPY_CLASS);
-                        INJECT.set(inject = injectClass.getConstructor(Class.class, int.class).newInstance(TraceEnhance.class, port));
+                        INJECT.set(inject =
+                            injectClass.getConstructor(Class.class, int.class).newInstance(TraceEnhance.class, port));
                     } catch (Throwable t) {
                         t.printStackTrace();
                     }
