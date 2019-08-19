@@ -15,7 +15,7 @@ import com.ali.trace.spy.jetty.JettyServer;
 
 /**
  * trace code inject
- * 
+ *
  * @author hanlang.hl
  *
  */
@@ -39,7 +39,8 @@ public class TraceInjecter {
         try {
             if (name != null) {
                 if ((loader != null && loader != LOADER
-                    && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer"))
+                    && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")
+                && !name.startsWith("com/google/gson/internal/reflect/ReflectionAccessor"))
                     || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
                     bytes = new CodeReader(loader, name, bytes).getBytes();
                     type = 1;
@@ -50,6 +51,7 @@ public class TraceInjecter {
             type = 2;
             throw t;
         } finally {
+            System.out.println("init [" + name + "] type [" + type + "]");
             if (name != null) {
                 ConfigPool.getPool().addClass(loader, name, type);
             }
@@ -94,7 +96,7 @@ public class TraceInjecter {
 
     /**
      * weave code before and after each method
-     * 
+     *
      * @author hanlang.hl
      *
      */

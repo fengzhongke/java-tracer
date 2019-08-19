@@ -28,7 +28,6 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
         return node;
     }
 
-    @Override
     public void start(String c, String m) {
         Stack<TreeNode> stack = t_stack.get();
         Stack<Long> time = t_time.get();
@@ -47,7 +46,6 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
         }
     }
 
-    @Override
     public void end(String c, String m) {
         Stack<TreeNode> stack = t_stack.get();
         Stack<Long> time = t_time.get();

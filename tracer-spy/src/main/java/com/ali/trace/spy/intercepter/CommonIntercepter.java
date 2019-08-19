@@ -42,7 +42,6 @@ public class CommonIntercepter extends BaseIntercepter {
 		this.printTime = printTime;
 	}
 
-	@Override
 	public void start(String c, String m) {
 		try {
 			Integer s = stack.get();
@@ -76,7 +75,6 @@ public class CommonIntercepter extends BaseIntercepter {
 		}
 	}
 
-	@Override
 	public void end(String c, String m) {
 		try {
 			stack.set(stack.get() - 1);

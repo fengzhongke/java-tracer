@@ -5,7 +5,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
@@ -23,23 +25,52 @@ import com.ali.trace.agent.loader.SpyClassLoader;
 public class Premain {
 
     private static final String PATH = "/META-INF/lib";
-    private static final SpyClassLoader LOADER = new SpyClassLoader(ClassLoader.getSystemClassLoader());
     private static final String SPY_CLASS = "com.ali.trace.spy.inject.TraceInjecter";
-    private static final AtomicReference<Object> INJECT = new AtomicReference<Object>();
     // default port opened by JETTY
     private static final int DEFAULT_PORT = 18902;
+    private static final String DEFAULT_CONFIG = "";
+
+    private static final String CONFIG_PORT="port";
+    private static final String CONFIG_SLEEP="sleep";
+
+
+    private static final SpyClassLoader LOADER = new SpyClassLoader(ClassLoader.getSystemClassLoader());
+    private static final AtomicReference<Object> INJECT = new AtomicReference<Object>();
 
     public static void premain(String args, Instrumentation inst) {
+        Map<String, String> configs = new HashMap<String, String>();
+
         int port = DEFAULT_PORT;
+        long sleep = 1L;
         if (args != null) {
-            port = Integer.valueOf(args);
+            String[] pairs = args.split(":");
+
+            if(pairs != null){
+                for(String pair : pairs){
+                    int idx  = pair.indexOf("=");
+                    if(idx > 0){
+                        configs.put(pair.substring(0, idx), pair.substring(idx+1));
+                    }else{
+                        configs.put(pair, DEFAULT_CONFIG);
+                    }
+                }
+            }
+            String portStr = configs.get(CONFIG_PORT);
+            if(portStr != null && portStr != DEFAULT_CONFIG){
+                port = Integer.valueOf(args);
+            }
+            String sleepStr = configs.get(CONFIG_SLEEP);
+            if(sleepStr != null){
+                sleep = Long.parseLong(sleepStr);
+            }
         }
-        System.out.println("init trace agent with port [" + port + "]");
+        System.out.println("init trace agent with port [" + port + "] and sleep [" + sleep + "]");
         Object inject = loadSpyJar(port);
         try {
             if (inject == null) {
                 throw new Exception("inject is null");
             }
+            Thread.sleep(sleep);
             inst.addTransformer(new TraceTransformer(inject));
         } catch (Throwable t) {
             t.printStackTrace();

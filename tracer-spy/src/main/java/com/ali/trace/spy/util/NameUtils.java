@@ -78,6 +78,7 @@ public class NameUtils {
 		System.out.println(getJarPath());
 		System.out.println(getMethodName("<clinit>"));
 
+		System.out.println("<cinit>".replaceAll("<|>", ""));
 	}
 
 }
