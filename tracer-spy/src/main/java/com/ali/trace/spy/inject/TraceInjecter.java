@@ -51,7 +51,6 @@ public class TraceInjecter {
             type = 2;
             throw t;
         } finally {
-            System.out.println("init [" + name + "] type [" + type + "]");
             if (name != null) {
                 ConfigPool.getPool().addClass(loader, name, type);
             }
