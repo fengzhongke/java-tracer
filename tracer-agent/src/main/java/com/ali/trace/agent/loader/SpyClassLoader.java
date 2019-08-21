@@ -45,6 +45,7 @@ public class SpyClassLoader extends ClassLoader {
                 while ((len = jarInput.read(data)) != -1) {
                     bytes.write(data, 0, len);
                 }
+                //System.out.println("file : " + entry.getName());
                 bytesMap.put(entry.getName(), bytes.toByteArray());
             }
         } catch (Throwable e) {

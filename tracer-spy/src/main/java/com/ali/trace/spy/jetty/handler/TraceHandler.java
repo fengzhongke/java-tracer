@@ -1,43 +1,128 @@
 package com.ali.trace.spy.jetty.handler;
 
-import java.io.IOException;
-import java.io.PrintWriter;
+import com.ali.trace.spy.core.ConfigPool;
+import com.ali.trace.spy.core.NodePool;
+import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
+import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
+import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.MetaVO;
+import com.ali.trace.spy.jetty.vo.RecordVO;
+import com.ali.trace.spy.jetty.vo.SetVO;
+import com.ali.trace.spy.jetty.vo.TraceVO;
+import com.ali.trace.spy.util.TreeNode;
+import org.apache.commons.lang.math.NumberUtils;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
-import com.ali.trace.spy.core.ConfigPool;
-import com.ali.trace.spy.intercepter.IIntercepter;
-import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.ITracerHttpHandler;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
-import com.ali.trace.spy.util.TreeNode;
+public class TraceHandler implements ITraceHttpHandler {
 
-public class TraceHandler extends ITracerHttpHandler {
+    private volatile ThreadCompressIntercepter intercepter;
+    private final NodePool nodePool = NodePool.getPool();
 
-    private volatile IIntercepter intercepter;
-
-    @TracerPath(value="/trace/set", params="type(can be compressThread),class,method", desc="set intercepter ")
-    public void set(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        PrintWriter writer = res.getWriter();
-        String type = req.getParameter("type");
-        if ("compressThread".equals(type)) {
-            String cname = req.getParameter("class");
-            String mname = req.getParameter("method");
-            boolean set = false;
-            if (cname != null && mname != null) {
-                intercepter = new ThreadCompressIntercepter(null, cname, mname);
-                set = ConfigPool.getPool().setIntercepter(intercepter);
+    @TracerPath(value = "/trace/set", order = 1)
+    public DataRet set(HttpServletRequest req) throws IOException {
+        String cname = req.getParameter("class");
+        String mname = req.getParameter("method");
+        String sizeStr = req.getParameter("size");
+        DataRet ret = null;
+        try {
+            if (NumberUtils.isDigits(sizeStr)) {
+                nodePool.setSize(Integer.valueOf(sizeStr));
             }
-            writer.write("set class:[" + cname + "]method:[" + mname + "]status:[" + set + "]");
+            if (cname != null && mname != null) {
+                cname = cname.trim();
+                mname = mname.trim();
+                if (cname != null && mname != null) {
+                    intercepter = new ThreadCompressIntercepter(cname, mname);
+                    ConfigPool.getPool().setIntercepter(intercepter);
+                }
+            }
+            ret = new DataRet(true, 0, "set class[" + cname + "]method[" + mname + "]size[" + sizeStr + "]");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "set class[" + cname + "]method[" + mname + "]failed" + e.getMessage());
         }
+        return ret;
     }
 
-    @TracerPath(value = "/trace/get", desc = "get xml trade of the method")
-    public void get(HttpServletRequest req, HttpServletResponse res) throws IOException, InterruptedException {
-        PrintWriter writer = res.getWriter();
-        if (intercepter != null && intercepter instanceof ThreadCompressIntercepter) {
-            TreeNode node = ((ThreadCompressIntercepter)intercepter).getNode();
+    @TracerPath(value = "/trace/getSet", order = 1)
+    public DataRet<SetVO> getSet() throws IOException {
+        DataRet<SetVO> ret = null;
+        try {
+            String cname = null;
+            String mname = null;
+            if (intercepter != null) {
+                cname = intercepter.getC();
+                mname = intercepter.getM();
+            }
+            long size = nodePool.getSize();
+            MetaVO metaVO = new MetaVO(cname, mname);
+            ret = new DataRet<SetVO>(true, 0, "get ok");
+            ret.setData(new SetVO(metaVO, size));
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "getSet failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/trace/list", order = 1)
+    public DataRet<List<RecordVO>> list() throws IOException {
+        DataRet<List<RecordVO>> ret = null;
+        try {
+            List<RecordVO> list = new ArrayList<RecordVO>();
+            Map<Long, Long> nodes = nodePool.getNodes();
+            for (Map.Entry<Long, Long> entry : nodes.entrySet()) {
+                long seed = entry.getKey();
+                String[] names = TreeNode.getName(entry.getValue());
+                list.add(new RecordVO(seed, new MetaVO(names[0], names[1])));
+            }
+            ret = new DataRet<List<RecordVO>>(true, 0, "get ok");
+            ret.setData(list);
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "list failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/trace/del", order = 1)
+    public DataRet<String> del() throws IOException {
+        DataRet<String> ret = null;
+        boolean del = ConfigPool.getPool().delIntercepter();
+        if (del) {
+            ret = new DataRet<String>(true, 0, "delete:[" + intercepter + "]success");
+            intercepter = null;
+        } else {
+            ret = new DataRet<String>(false, -1, "delete:[" + intercepter + "]success");
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/trace/getjson", order = 1)
+    public DataRet<TraceVO> getjson(HttpServletRequest req) throws IOException, InterruptedException {
+        DataRet<TraceVO> ret = null;
+        String id = req.getParameter("id");
+        try {
+            Long seed = Long.valueOf(id);
+            TreeNode node = nodePool.getNode(seed);
+            Map<Long, String[]> metas = node.getMetas();
+            ret = new DataRet<TraceVO>(true, 0, "getjson id:[" + id + "]success");
+            ret.setData(new TraceVO(node, metas));
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "getjson id:[" + id + "]failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/trace/get", order = 1)
+    public void get(HttpServletRequest req, PrintWriter writer) throws IOException, InterruptedException {
+        String id = req.getParameter("id");
+        Long seed = Long.valueOf(id);
+        if (intercepter != null) {
+            TreeNode node = nodePool.getNode(seed);
             if (node != null) {
                 writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
                 node.writeFile(writer);
@@ -49,12 +134,4 @@ public class TraceHandler extends ITracerHttpHandler {
         }
     }
 
-    @TracerPath(value = "/trace/del", desc = "delete the intercepter")
-    public void del(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        PrintWriter writer = res.getWriter();
-        IIntercepter old = intercepter;
-        intercepter = null;
-        boolean del = ConfigPool.getPool().delIntercepter();
-        writer.write("del intercepter:[" + old + "]status:[" + del + "]");
-    }
 }

@@ -12,13 +12,13 @@ import com.ali.trace.spy.intercepter.IIntercepter;
 
 public class ConfigPool {
 
-    private static final ConfigPool POOL = new ConfigPool();
+    private static final ConfigPool INSTANCE = new ConfigPool();
 
     private CopyOnWriteArrayList<LoaderSet> loaderSets = new CopyOnWriteArrayList<LoaderSet>();
     private Class<?> weaveClass;
 
     public static ConfigPool getPool() {
-        return POOL;
+        return INSTANCE;
     }
 
     public List<ClassLoader> getLoaders() {

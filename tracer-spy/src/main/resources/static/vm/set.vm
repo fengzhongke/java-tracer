@@ -1,0 +1,57 @@
+<head>
+    <title></title>
+    <link rel="stylesheet" href="http://cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <script src="http://cdn.bootcss.com/jquery/1.11.3/jquery.min.js"></script>
+    <script src="http://cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-inverse" role="navigation">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="/">java-tracer</a>
+        </div>
+        <div>
+            <ul class="nav navbar-nav">
+                <li class="active"><a href="/">home</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="list-group">
+    <a href="" class="list-group-item active">
+        <h4 class="list-group-item-heading">
+            system info
+        </h4>
+    </a>
+    <a href="/class" class="list-group-item" target="_blank">
+        <p class="list-group-item-text">
+            classLoader & class
+        </p>
+    </a>
+    <a href="/thread" class="list-group-item" target="_blank">
+        <p class="list-group-item-text">
+            thread
+        </p>
+    </a>
+</div>
+<div class="list-group">
+    <a href="#" class="list-group-item active">
+        <h4 class="list-group-item-heading">
+            method trace
+        </h4>
+    </a>
+    <a href="/get" class="list-group-item" target="_blank">
+        <p class="list-group-item-text">
+            trace set
+        </p>
+    </a>
+    <a href="/set" class="list-group-item" target="_blank">
+        <p class="list-group-item-text">
+            get trace
+        </p>
+    </a>
+</div>
+</body>
+</html>

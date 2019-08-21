@@ -41,7 +41,7 @@ public class CoreEngine {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);
             System.out.println("class:[" + clasz + "]method:[" + method + "]");
-            TraceEnhance.setIntecepter(new ThreadCompressIntercepter(path, clasz, method));
+            TraceEnhance.setIntecepter(new ThreadCompressIntercepter(clasz, method));
         } else if ("thread".equals(intercepter)) {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);

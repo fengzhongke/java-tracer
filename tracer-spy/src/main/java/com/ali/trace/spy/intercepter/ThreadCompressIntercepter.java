@@ -1,31 +1,30 @@
 package com.ali.trace.spy.intercepter;
 
-import java.util.Stack;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-
+import com.ali.trace.spy.core.NodePool;
 import com.ali.trace.spy.util.TreeNode;
+
+import java.util.Stack;
 
 public class ThreadCompressIntercepter extends BaseIntercepter {
 
-    private LinkedBlockingQueue<TreeNode> queue = new LinkedBlockingQueue<TreeNode>();
-    private String c;
-    private String m;
+    private final String c;
+    private final String m;
     private final ThreadLocal<Stack<TreeNode>> t_stack = new ThreadLocal<Stack<TreeNode>>();
     private final ThreadLocal<Stack<Long>> t_time = new ThreadLocal<Stack<Long>>();
+    private final NodePool nodePool;
 
-    public ThreadCompressIntercepter(String path, String c, String m) {
-        super(path);
+    public ThreadCompressIntercepter(String c, String m) {
+        super(null);
         this.c = c;
         this.m = m;
+        nodePool = NodePool.getPool();
     }
 
-    public TreeNode getNode() throws InterruptedException {
-        TreeNode node = null;
-        if (!queue.isEmpty()) {
-            node = queue.poll(50, TimeUnit.MILLISECONDS);
-        }
-        return node;
+    public String getC(){
+        return c;
+    }
+    public String getM(){
+        return m;
     }
 
     public void start(String c, String m) {
@@ -34,7 +33,10 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
         if (c.equalsIgnoreCase(this.c) && m.equalsIgnoreCase(this.m)) {
             if (stack == null) {
                 t_stack.set(stack = new Stack<TreeNode>());
-                stack.add(new TreeNode(TreeNode.getId(c, m)));
+                long metaId = TreeNode.getId(c, m);
+                TreeNode node = new TreeNode(metaId);
+                nodePool.addNode(node);
+                stack.add(node);
                 t_time.set(time = new Stack<Long>());
             }
         }
@@ -58,7 +60,6 @@ public class ThreadCompressIntercepter extends BaseIntercepter {
             }
         }
         if (stack != null && stack.isEmpty()) {
-            queue.offer(node);
             t_stack.set(null);
             t_time.set(null);
         }

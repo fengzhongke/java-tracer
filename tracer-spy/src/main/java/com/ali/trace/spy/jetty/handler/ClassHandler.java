@@ -1,5 +1,9 @@
 package com.ali.trace.spy.jetty.handler;
 
+import com.ali.trace.spy.core.ConfigPool;
+import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
+import com.ali.trace.spy.xml.XmlNode;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -12,19 +16,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+public class ClassHandler implements ITraceHttpHandler {
 
-import com.ali.trace.spy.core.ConfigPool;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.ITracerHttpHandler;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
-import com.ali.trace.spy.xml.XmlNode;
-
-public class ClassHandler extends ITracerHttpHandler {
-
-    @TracerPath(value = "/class", desc = "get class loaders and its classes")
-    public void thread(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        PrintWriter writer = res.getWriter();
+    @TracerPath(value = "/class", order = 10)
+    public void thread(PrintWriter writer) throws IOException {
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
         ConfigPool pool = ConfigPool.getPool();
         RootNode root = new RootNode();
@@ -73,7 +68,6 @@ public class ClassHandler extends ITracerHttpHandler {
         @Override
         protected Collection<LoaderNode> getChildren() {
             Collections.sort(children, new Comparator<LoaderNode>() {
-                @Override
                 public int compare(LoaderNode o1, LoaderNode o2) {
                     return o2.cnt - o1.cnt;
                 }

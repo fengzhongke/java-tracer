@@ -44,7 +44,6 @@ public class Premain {
         long sleep = 1L;
         if (args != null) {
             String[] pairs = args.split(":");
-
             if(pairs != null){
                 for(String pair : pairs){
                     int idx  = pair.indexOf("=");
@@ -65,6 +64,7 @@ public class Premain {
             }
         }
         System.out.println("init trace agent with port [" + port + "] and sleep [" + sleep + "]");
+        System.out.println("pages can be found in http://127.0.0.1:" + port);
         Object inject = loadSpyJar(port);
         try {
             if (inject == null) {

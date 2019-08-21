@@ -1,5 +1,8 @@
 package com.ali.trace.spy.jetty.handler;
 
+import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
+import com.ali.trace.spy.xml.XmlNode;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -11,19 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+public class ThreadHandler implements ITraceHttpHandler {
 
-import com.ali.trace.spy.jetty.ModuleHttpServlet.ITracerHttpHandler;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
-import com.ali.trace.spy.xml.XmlNode;
-
-public class ThreadHandler extends ITracerHttpHandler {
-
-    @TracerPath(value = "/thread", desc = "get system threads")
-    public void thread(HttpServletRequest req, HttpServletResponse res) throws IOException {
+    @TracerPath(value = "/thread", order = 10)
+    public void thread(PrintWriter writer) throws IOException {
         Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
-        PrintWriter writer = res.getWriter();
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
         Node root = new RootNode(stackTraces.size());
         for (Entry<Thread, StackTraceElement[]> entry : stackTraces.entrySet()) {
@@ -90,7 +85,8 @@ public class ThreadHandler extends ITracerHttpHandler {
         int cnt;
         Map<String, Node> children = new LinkedHashMap<String, Node>();
 
-        private Node() {}
+        private Node() {
+        }
 
         private Node(String cname, String mname, int line) {
             this.cname = cname;
@@ -129,7 +125,6 @@ public class ThreadHandler extends ITracerHttpHandler {
         protected Collection<Node> getChildren() {
             List<Node> sons = new ArrayList<Node>(children.values());
             Collections.sort(sons, new Comparator<Node>() {
-                @Override
                 public int compare(Node o1, Node o2) {
                     return o2.cnt - o1.cnt;
                 }
