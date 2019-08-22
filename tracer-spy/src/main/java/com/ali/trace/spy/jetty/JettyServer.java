@@ -42,6 +42,9 @@ public class JettyServer {
     }
 
     public static void main(String[] args) {
-        new JettyServer(8080);
+        {
+            int port = 8080;
+            new JettyServer(port);
+        }
     }
 }

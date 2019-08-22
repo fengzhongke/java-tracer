@@ -1,11 +1,17 @@
 package com.ali.trace.spy.util;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,14 +43,14 @@ public class TreeNode {
             synchronized (cMap) {
                 if ((id = cMap.get(method)) == null) {
                     cMap.put(method, id = seq.incrementAndGet());
-                    nameMap.put(id, new String[] {service, method});
+                    nameMap.put(id, new String[]{service, method});
                 }
             }
         }
         return id;
     }
 
-    public static String[] getName(long id){
+    public static String[] getName(long id) {
         return nameMap.get(id);
     }
 
@@ -73,7 +79,7 @@ public class TreeNode {
         return nameMap.get(i);
     }
 
-    public long getId(){
+    public long getId() {
         return i;
     }
 
@@ -96,16 +102,16 @@ public class TreeNode {
         writer.write(">\r\n");
     }
 
-    public Map<Long, String[]> getMetas(){
+    public Map<Long, String[]> getMetas() {
         Map<Long, String[]> metas = new HashMap<Long, String[]>();
         Stack<TreeNode> stack = new Stack<TreeNode>();
         stack.push(this);
-        while(!stack.isEmpty()){
+        while (!stack.isEmpty()) {
             TreeNode node = stack.pop();
-            if(!metas.containsKey(node.i)){
+            if (!metas.containsKey(node.i)) {
                 metas.put(node.i, getName(node.i));
             }
-            if(!node.s.isEmpty()){
+            if (!node.s.isEmpty()) {
                 stack.addAll(node.s.values());
             }
         }
@@ -113,7 +119,7 @@ public class TreeNode {
     }
 
     public void writeFile(Writer writer, int depth) throws IOException {
-        if(depth > 0) {
+        if (depth > 0) {
             String[] items = nameMap.get(i);
             if (items == null) {
                 throw new RuntimeException("name not exists ![" + i + "]");
@@ -138,9 +144,9 @@ public class TreeNode {
         TreeNode node = new TreeNode(id);
         node.addSon(TreeNode.getId("com.test.Service", "main1"), 1L);
         node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
-        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
-        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
-        node.addSon(TreeNode.getId("com.test.Service", "main"), 1L);
+        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L)
+                .addSon(TreeNode.getId("com.test.Service1", "main"), 1L)
+                .addSon(TreeNode.getId("com.test.Service", "main"), 1L);
         BufferedWriter writer = null;
         try {
             writer = new BufferedWriter(new FileWriter("/tmp/test.xml"));
@@ -158,7 +164,17 @@ public class TreeNode {
         map.put(4, 12);
         map.put(6, 12);
         map.put(2, 12);
-        System.out.println(new Gson().toJson(map));
+        System.out.println("map : " + new Gson().toJson(map));
+
+        System.out.println(new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, new JsonSerializer<LinkedHashMap>() {
+            public JsonElement serialize(LinkedHashMap src, Type typeOfSrc, JsonSerializationContext context) {
+                if(!src.isEmpty()){
+                    return new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, this).create().toJsonTree(src.values());
+                }else{
+                    return null;
+                }
+            }
+        }).create().toJson(node));
 
     }
 
