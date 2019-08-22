@@ -1,7 +1,6 @@
 package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.core.ConfigPool;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
 import com.ali.trace.spy.xml.XmlNode;
 
 import java.io.IOException;

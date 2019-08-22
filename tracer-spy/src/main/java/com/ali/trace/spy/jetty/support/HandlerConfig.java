@@ -1,9 +1,8 @@
 package com.ali.trace.spy.jetty.support;
 
-import com.ali.trace.spy.jetty.ModuleHttpServlet;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
 import com.ali.trace.spy.jetty.handler.ClassHandler;
 import com.ali.trace.spy.jetty.handler.ITraceHttpHandler;
+import com.ali.trace.spy.jetty.handler.ITraceHttpHandler.TracerPath;
 import com.ali.trace.spy.jetty.handler.IndexHandler;
 import com.ali.trace.spy.jetty.handler.StaticHandler;
 import com.ali.trace.spy.jetty.handler.ThreadHandler;
@@ -49,7 +48,7 @@ public class HandlerConfig {
         Class<?> clasz = handler.getClass();
         Method[] methods = clasz.getDeclaredMethods();
         for (Method method : methods) {
-            ModuleHttpServlet.TracerPath tracerPath = method.getAnnotation(TracerPath.class);
+            TracerPath tracerPath = method.getAnnotation(TracerPath.class);
             if (tracerPath != null) {
                 String path = tracerPath.value();
                 if (path != null && (path = path.trim()).length() > 0) {
@@ -70,5 +69,4 @@ public class HandlerConfig {
             }
         }
     }
-
 }

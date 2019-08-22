@@ -1,6 +1,5 @@
 package com.ali.trace.spy.jetty.handler;
 
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
 import com.ali.trace.spy.jetty.io.VmViewResolver;
 
 import java.io.IOException;

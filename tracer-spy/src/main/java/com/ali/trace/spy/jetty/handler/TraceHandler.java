@@ -3,7 +3,6 @@ package com.ali.trace.spy.jetty.handler;
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.NodePool;
 import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
-import com.ali.trace.spy.jetty.ModuleHttpServlet.TracerPath;
 import com.ali.trace.spy.jetty.vo.DataRet;
 import com.ali.trace.spy.jetty.vo.MetaVO;
 import com.ali.trace.spy.jetty.vo.RecordVO;
@@ -12,7 +11,6 @@ import com.ali.trace.spy.jetty.vo.TraceVO;
 import com.ali.trace.spy.util.TreeNode;
 import org.apache.commons.lang.math.NumberUtils;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -25,22 +23,17 @@ public class TraceHandler implements ITraceHttpHandler {
     private final NodePool nodePool = NodePool.getPool();
 
     @TracerPath(value = "/trace/set", order = 1)
-    public DataRet set(HttpServletRequest req) throws IOException {
-        String cname = req.getParameter("class");
-        String mname = req.getParameter("method");
-        String sizeStr = req.getParameter("size");
+    public DataRet set(PrintWriter writer, @TraceParam("class") String cname,
+                       @TraceParam("method") String mname,
+                       @TraceParam("size") String sizeStr) throws IOException {
         DataRet ret = null;
         try {
             if (NumberUtils.isDigits(sizeStr)) {
                 nodePool.setSize(Integer.valueOf(sizeStr));
             }
             if (cname != null && mname != null) {
-                cname = cname.trim();
-                mname = mname.trim();
-                if (cname != null && mname != null) {
-                    intercepter = new ThreadCompressIntercepter(cname, mname);
-                    ConfigPool.getPool().setIntercepter(intercepter);
-                }
+                intercepter = new ThreadCompressIntercepter(cname, mname);
+                ConfigPool.getPool().setIntercepter(intercepter);
             }
             ret = new DataRet(true, 0, "set class[" + cname + "]method[" + mname + "]size[" + sizeStr + "]");
         } catch (Exception e) {
@@ -102,9 +95,8 @@ public class TraceHandler implements ITraceHttpHandler {
     }
 
     @TracerPath(value = "/trace/getjson", order = 1)
-    public DataRet<TraceVO> getjson(HttpServletRequest req) throws IOException, InterruptedException {
+    public DataRet<TraceVO> getjson(@TraceParam("id") String id) throws IOException, InterruptedException {
         DataRet<TraceVO> ret = null;
-        String id = req.getParameter("id");
         try {
             Long seed = Long.valueOf(id);
             TreeNode node = nodePool.getNode(seed);
@@ -118,8 +110,7 @@ public class TraceHandler implements ITraceHttpHandler {
     }
 
     @TracerPath(value = "/trace/get", order = 1)
-    public void get(HttpServletRequest req, PrintWriter writer) throws IOException, InterruptedException {
-        String id = req.getParameter("id");
+    public void get(@TraceParam("id") String id, PrintWriter writer) throws IOException, InterruptedException {
         Long seed = Long.valueOf(id);
         if (intercepter != null) {
             TreeNode node = nodePool.getNode(seed);
