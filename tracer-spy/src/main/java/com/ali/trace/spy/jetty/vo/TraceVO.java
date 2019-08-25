@@ -5,7 +5,7 @@ import com.ali.trace.spy.util.TreeNode;
 import java.util.Map;
 
 /**
- * @auther hanlang@mallcai.com
+ * @author nkhanlang@163.com
  * @date 2019-08-21 00:51
  */
 public class TraceVO {

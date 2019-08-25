@@ -1,6 +1,8 @@
 package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.core.ConfigPool;
+import com.ali.trace.spy.core.ConfigPool.LoaderSet;
+import com.ali.trace.spy.jetty.vo.DataRet;
 import com.ali.trace.spy.xml.XmlNode;
 
 import java.io.IOException;
@@ -15,6 +17,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ClassHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/class", order = 10)
@@ -22,20 +27,44 @@ public class ClassHandler implements ITraceHttpHandler {
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
         ConfigPool pool = ConfigPool.getPool();
         RootNode root = new RootNode();
-        for (ClassLoader loader : pool.getLoaders()) {
+        for (LoaderSet loader : pool.getLoaderSets()) {
             String name = "";
             if (loader != null) {
                 name = loader.toString().replaceAll("'|<|>|\\$", "_");
             }
             LoaderNode node = root.addLoader(name);
-            Map<String, Integer> classNames = pool.getClassNames(loader);
+            Map<String, Integer> classNames = loader.getClassNames();
             for (Entry<String, Integer> entry : classNames.entrySet()) {
                 String cname = entry.getKey();
                 cname = cname.replaceAll("'|<|>|\\$", "_");
-                node.addClass(cname, entry.getValue());
+                node.addClass(cname, entry.getValue(), loader.getId());
             }
         }
         root.write(writer);
+    }
+
+    @TracerPath(value = "/class/redefine", order = 10)
+    public DataRet<String> redefine(@TraceParam("lid")String loaderId, @TraceParam("cname")String cname) throws IOException {
+        DataRet<String> ret = null;
+        try {
+            ClassLoader loader = ConfigPool.getPool().redefine(Integer.valueOf(loaderId), cname);
+            ret = new DataRet(true, 0, "redefine class[" + cname + "]lid[" + loaderId + "]loader[" + loader + "]");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "redefine class[" + cname + "]lid[" + loaderId + "]failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/redefineType", order = 10)
+    public DataRet<String> redefineType(@TraceParam("type")String type) throws IOException {
+        DataRet<String> ret = null;
+        try {
+            ConfigPool.getPool().redefine(Integer.valueOf(type));
+            ret = new DataRet(true, 0, "redefine type failed");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "redefine type failed" + e.getMessage());
+        }
+        return ret;
     }
 
     class RootNode extends LoaderNode {
@@ -54,12 +83,14 @@ public class ClassHandler implements ITraceHttpHandler {
             return node;
         }
 
+        @Override
         protected String getStart() {
             StringBuilder sb = new StringBuilder("\r\n<loaders ");
             sb.append(" cnt='").append(cnt);
             return sb.append("'>").toString();
         }
 
+        @Override
         protected String getEnd() {
             return "\r\n</loaders>";
         }
@@ -76,20 +107,25 @@ public class ClassHandler implements ITraceHttpHandler {
     }
 
     class ClassNode extends LoaderNode {
-        Integer type;
+        int type;
+        int loaderId;
 
-        ClassNode(String name, Integer type) {
+        ClassNode(String name, int type, int loaderId) {
             super(name);
             this.type = type;
+            this.loaderId = loaderId;
         }
 
+        @Override
         protected String getStart() {
             StringBuilder sb = new StringBuilder("\r\n<class");
             sb.append(" name='").append(name);
             sb.append("' type='").append(type);
+            sb.append("' lid='").append(loaderId);
             return sb.append("'>").toString();
         }
 
+        @Override
         protected String getEnd() {
             return "\r\n</class>";
         }
@@ -109,11 +145,12 @@ public class ClassHandler implements ITraceHttpHandler {
             this.name = name;
         }
 
-        void addClass(String className, Integer type) {
+        void addClass(String className, int type, int loaderId) {
             cnt++;
-            children.add(new ClassNode(className, type));
+            children.add(new ClassNode(className, type, loaderId));
         }
 
+        @Override
         protected String getStart() {
             StringBuilder sb = new StringBuilder("\r\n<loader");
             sb.append(" name='").append(name);
@@ -121,6 +158,7 @@ public class ClassHandler implements ITraceHttpHandler {
             return sb.append("'>").toString();
         }
 
+        @Override
         protected String getEnd() {
             return "\r\n</loader>";
         }

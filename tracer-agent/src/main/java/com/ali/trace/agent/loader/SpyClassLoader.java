@@ -15,8 +15,8 @@ import java.util.jar.JarInputStream;
 
 /**
  * self define classLoader to load jar bytes resources
- * 
- * @author hanlang.hl
+ *
+ * @author nkhanlang@163.com
  *
  */
 public class SpyClassLoader extends ClassLoader {

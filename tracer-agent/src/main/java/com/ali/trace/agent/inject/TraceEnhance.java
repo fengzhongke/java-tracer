@@ -2,6 +2,9 @@ package com.ali.trace.agent.inject;
 
 import java.lang.reflect.Method;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class TraceEnhance {
 
     /**

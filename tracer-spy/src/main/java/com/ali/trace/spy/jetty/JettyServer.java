@@ -1,22 +1,16 @@
 package com.ali.trace.spy.jetty;
 
-import com.ali.trace.spy.jetty.handler.IndexHandler;
-import com.ali.trace.spy.jetty.handler.StaticHandler;
 import com.ali.trace.spy.jetty.support.HandlerConfig;
-import  org.eclipse.jetty.servlet.ServletContextHandler;
-
-import java.net.InetSocketAddress;
-
-import javax.servlet.Servlet;
-
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
-import com.ali.trace.spy.jetty.handler.ClassHandler;
-import com.ali.trace.spy.jetty.handler.ThreadHandler;
-import com.ali.trace.spy.jetty.handler.TraceHandler;
+import java.net.InetSocketAddress;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class JettyServer {
 
     public JettyServer(int port) {

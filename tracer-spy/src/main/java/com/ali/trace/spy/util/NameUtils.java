@@ -4,6 +4,9 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class NameUtils {
 	
 	/**

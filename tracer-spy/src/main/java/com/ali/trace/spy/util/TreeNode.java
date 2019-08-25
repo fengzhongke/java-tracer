@@ -18,6 +18,9 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class TreeNode {
 
     private long i;

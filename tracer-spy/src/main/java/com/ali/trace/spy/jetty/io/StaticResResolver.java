@@ -11,6 +11,9 @@ import java.io.Writer;
 import java.util.Map;
 import java.util.Properties;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class StaticResResolver {
 
     public static void resolve(String file, Writer writer) {

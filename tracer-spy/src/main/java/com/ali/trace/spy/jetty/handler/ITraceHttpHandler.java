@@ -5,13 +5,14 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.HashMap;
+
 
 /**
- * @auther hanlang@mallcai.com
+ * @author nkhanlang@163.com
  * @date 2019-08-21 23:32
  */
 public interface ITraceHttpHandler {
-
 
     @Target({ElementType.METHOD})
     @Retention(RetentionPolicy.RUNTIME)
@@ -28,4 +29,13 @@ public interface ITraceHttpHandler {
         String value() default "";
     }
 
+    @Target({ElementType.METHOD})
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    public @interface TraceView {
+    }
+
+    public class ModelMap extends HashMap<String, Object>{
+
+    }
 }

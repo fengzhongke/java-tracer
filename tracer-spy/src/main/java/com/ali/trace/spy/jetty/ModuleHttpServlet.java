@@ -1,6 +1,9 @@
 package com.ali.trace.spy.jetty;
 
+import com.ali.trace.spy.jetty.handler.ITraceHttpHandler.ModelMap;
 import com.ali.trace.spy.jetty.handler.ITraceHttpHandler.TraceParam;
+import com.ali.trace.spy.jetty.handler.ITraceHttpHandler.TraceView;
+import com.ali.trace.spy.jetty.io.VmViewResolver;
 import com.ali.trace.spy.jetty.support.HandlerConfig;
 import com.ali.trace.spy.jetty.support.Module;
 
@@ -12,8 +15,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ModuleHttpServlet extends HttpServlet {
 
     /**
@@ -56,9 +63,22 @@ public class ModuleHttpServlet extends HttpServlet {
         if (module != null) {
             Method method = module.getMethod();
             try {
-                Object ret = method.invoke(module.getHttpHandler(), generateParams(method, req, resp));
+                Object[] params = generateParams(method, req, resp);
+                Object ret = method.invoke(module.getHttpHandler(), params);
                 if (ret != null) {
-                    writer.write(ret.toString());
+                    TraceView view = method.getAnnotation(TraceView.class);
+                    if(ret instanceof String && view != null){
+                        String viewPath = "static/vm/" + ret + ".vm";
+                        Map<String, Object> model = new HashMap<String, Object>();
+                        for(Object param : params){
+                            if(param instanceof ModelMap){
+                                model.putAll((ModelMap)param);
+                            }
+                        }
+                        VmViewResolver.resolve(viewPath, model, writer);
+                    }else{
+                        writer.write(ret.toString());
+                    }
                 }
             } catch (Throwable e) {
                 e.printStackTrace(writer);
@@ -98,6 +118,8 @@ public class ModuleHttpServlet extends HttpServlet {
                             }
                         }
                     }
+                }else if(ModelMap.class.isAssignableFrom(paramType)){
+                    params[index] = new ModelMap();
                 }
             }
             return params;

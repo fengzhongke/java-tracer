@@ -18,9 +18,7 @@ import com.ali.trace.agent.inject.TraceTransformer;
 import com.ali.trace.agent.loader.SpyClassLoader;
 
 /**
- * 
- * @author hanlang.hl
- *
+ * @author nkhanlang@163.com
  */
 public class Premain {
 
@@ -65,13 +63,13 @@ public class Premain {
         }
         System.out.println("init trace agent with port [" + port + "] and sleep [" + sleep + "]");
         System.out.println("pages can be found in http://127.0.0.1:" + port);
-        Object inject = loadSpyJar(port);
+        Object inject = loadSpyJar(inst, port);
         try {
             if (inject == null) {
                 throw new Exception("inject is null");
             }
             Thread.sleep(sleep);
-            inst.addTransformer(new TraceTransformer(inject));
+            inst.addTransformer(new TraceTransformer(inject), true);
         } catch (Throwable t) {
             t.printStackTrace();
         }
@@ -80,7 +78,7 @@ public class Premain {
     /**
      * agent loaded by bootstrap loader, spy and all dependent jars loaded by spy loader
      */
-    private static Object loadSpyJar(int port) {
+    private static Object loadSpyJar(Instrumentation inst, int port) {
         Object inject = null;
         if ((inject = INJECT.get()) == null) {
             synchronized (Premain.class) {
@@ -120,7 +118,7 @@ public class Premain {
                         }
                         Class<?> injectClass = LOADER.loadClass(SPY_CLASS);
                         INJECT.set(inject =
-                            injectClass.getConstructor(Class.class, int.class).newInstance(TraceEnhance.class, port));
+                            injectClass.getConstructor(Instrumentation.class, Class.class, int.class).newInstance(inst, TraceEnhance.class, port));
                     } catch (Throwable t) {
                         t.printStackTrace();
                     }
@@ -140,7 +138,7 @@ public class Premain {
             try {
                 if (clasz.getClassLoader() != null && clasz.getClassLoader().getParent() != null
                     && !CANT_TRANSFORM.contains(name)) {
-                    inst.retransformClasses(new Class<?>[] {clasz});
+//                    inst.retransformClasses(new Class<?>[] {clasz});
                 }
             } catch (Throwable t) {
                 CANT_TRANSFORM.add(name);

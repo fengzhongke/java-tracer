@@ -5,6 +5,9 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class TraceTransformer implements ClassFileTransformer {
     final Object INJECTER;
     final Method GET_BYTES;

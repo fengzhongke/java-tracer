@@ -13,8 +13,8 @@ import com.ali.trace.spy.util.NameUtils;
 
 /**
  * delete duplication stacks
- * 
- * @author hanlang.hl
+ *
+ * @author nkhanlang@163.com
  *
  */
 public class CompressIntercepter extends BaseIntercepter {

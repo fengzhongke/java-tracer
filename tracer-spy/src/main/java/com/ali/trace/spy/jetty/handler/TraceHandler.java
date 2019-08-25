@@ -17,16 +17,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class TraceHandler implements ITraceHttpHandler {
 
     private volatile ThreadCompressIntercepter intercepter;
     private final NodePool nodePool = NodePool.getPool();
 
     @TracerPath(value = "/trace/set", order = 1)
-    public DataRet set(PrintWriter writer, @TraceParam("class") String cname,
+    public DataRet<String> set(PrintWriter writer, @TraceParam("class") String cname,
                        @TraceParam("method") String mname,
                        @TraceParam("size") String sizeStr) throws IOException {
-        DataRet ret = null;
+        DataRet<String> ret = null;
         try {
             if (NumberUtils.isDigits(sizeStr)) {
                 nodePool.setSize(Integer.valueOf(sizeStr));
@@ -34,10 +37,13 @@ public class TraceHandler implements ITraceHttpHandler {
             if (cname != null && mname != null) {
                 intercepter = new ThreadCompressIntercepter(cname, mname);
                 ConfigPool.getPool().setIntercepter(intercepter);
+            }else{
+                ConfigPool.getPool().delIntercepter();
+                intercepter = null;
             }
-            ret = new DataRet(true, 0, "set class[" + cname + "]method[" + mname + "]size[" + sizeStr + "]");
+            ret = new DataRet<String>(true, 0, "set class[" + cname + "]method[" + mname + "]size[" + sizeStr + "]");
         } catch (Exception e) {
-            ret = new DataRet(false, -1, "set class[" + cname + "]method[" + mname + "]failed" + e.getMessage());
+            ret = new DataRet<String>(false, -1, "set class[" + cname + "]method[" + mname + "]failed" + e.getMessage());
         }
         return ret;
     }
@@ -81,20 +87,7 @@ public class TraceHandler implements ITraceHttpHandler {
         return ret;
     }
 
-    @TracerPath(value = "/trace/del", order = 1)
-    public DataRet<String> del() throws IOException {
-        DataRet<String> ret = null;
-        boolean del = ConfigPool.getPool().delIntercepter();
-        if (del) {
-            ret = new DataRet<String>(true, 0, "delete:[" + intercepter + "]success");
-            intercepter = null;
-        } else {
-            ret = new DataRet<String>(false, -1, "delete:[" + intercepter + "]success");
-        }
-        return ret;
-    }
-
-    @TracerPath(value = "/trace/getjson", order = 1)
+    @TracerPath(value = "/trace/get.json", order = 1)
     public DataRet<TraceVO> getjson(@TraceParam("id") String id) throws IOException, InterruptedException {
         DataRet<TraceVO> ret = null;
         try {
@@ -109,7 +102,7 @@ public class TraceHandler implements ITraceHttpHandler {
         return ret;
     }
 
-    @TracerPath(value = "/trace/get", order = 1)
+    @TracerPath(value = "/trace/get.xml", order = 1)
     public void get(@TraceParam("id") String id, PrintWriter writer) throws IOException, InterruptedException {
         Long seed = Long.valueOf(id);
         if (intercepter != null) {
@@ -123,6 +116,13 @@ public class TraceHandler implements ITraceHttpHandler {
         } else {
             writer.write("no result intercepter is null");
         }
+    }
+
+    @TracerPath(value = "/trace", order = 1)
+    @TraceView
+    public String trace(ModelMap map, @TraceParam("id") String id) throws IOException {
+        map.put("id", id);
+        return "trace";
     }
 
 }

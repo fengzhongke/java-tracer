@@ -7,6 +7,9 @@ import org.apache.velocity.runtime.resource.loader.ResourceLoader;
 
 import java.io.InputStream;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class AgentResVmLoader extends ResourceLoader {
 
     private static AgentResVmLoader instance;

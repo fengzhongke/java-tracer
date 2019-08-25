@@ -1,7 +1,7 @@
 package com.ali.trace.spy.jetty.vo;
 
 /**
- * @auther hanlang@mallcai.com
+ * @author nkhanlang@163.com
  * @date 2019-08-21 00:51
  */
 public class MetaVO {

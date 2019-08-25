@@ -1,5 +1,8 @@
 package com.ali.trace.spy.intercepter;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ThreadIntercepter extends CommonIntercepter {
 
 	private String c;

@@ -7,6 +7,9 @@ import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+/**
+ * @author nkhanlang@163.com
+ */
 class CrunchifyReverseLineReader {
     private static final int BUFFER_SIZE = 8192;
     private final FileChannel channel;

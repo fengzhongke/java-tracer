@@ -9,7 +9,9 @@ import com.ali.trace.spy.intercepter.CommonIntercepter;
 import com.ali.trace.spy.intercepter.CompressIntercepter;
 import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
 import com.ali.trace.spy.intercepter.ThreadIntercepter;
-
+/**
+ * @author nkhanlang@163.com
+ */
 public class CoreEngine {
 
     private static String INTERCEPTER = "intercepter";

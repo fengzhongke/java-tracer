@@ -21,7 +21,7 @@ $('#refresh').click(function(){
                 var li = demo.clone();
                 li.removeClass('list-demo');
                 li.addClass('list-group-item');
-                $('#form_href', li).attr('href', '/trace/get?id=' + item.seed);
+                $('#form_href', li).attr('href', '/trace?id=' + item.seed);
                 $('label[name=cname_mname]', li).html(item.metaVO.cname + "." + item.metaVO.mname);
                 demo.after(li);
             }
@@ -36,19 +36,6 @@ $('#set').click(function(){
         $('input[name=model_size]').val(data.size);
     }
 });
-// $('#clear').click(function(){
-//     if(confirm("clear trace ? ")){
-//         $.post("/trace/del", function(str){
-//             var ret = JSON.parse(str);
-//             if(ret.status){
-//                 alert("clear sucess!");
-//                 location.reload();
-//             }else{
-//                 alert("clear failed :[" + ret.msg + "]");
-//             }
-//         });
-//     }
-// });
 
 $('#confirm').click(function(){
     var cname = $('input[name=model_cname]').val();
@@ -66,3 +53,4 @@ $('#confirm').click(function(){
         });
     }
 });
+

@@ -11,8 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * @auther hanlang@mallcai.com
- * @date 2019-08-21 22:37
+ * @author nkhanlang@163.com
  */
 public class NodePool {
 

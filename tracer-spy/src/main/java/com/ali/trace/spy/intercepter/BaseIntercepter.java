@@ -10,8 +10,8 @@ import com.ali.trace.spy.helper.ThreadFileNameGenerator;
 
 /**
  * print XML format stacks
- * 
- * @author hanlang.hl
+ *
+ * @author nkhanlang@163.com
  *
  */
 public abstract class BaseIntercepter implements IIntercepter {

@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Collection;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public abstract class XmlNode<T extends XmlNode<T>> {
 
     protected abstract Collection<T> getChildren();

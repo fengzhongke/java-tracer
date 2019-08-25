@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class InputStreamClassLoader extends ClassLoader {
     private Map<String, byte[]> classBytes = new HashMap<String, byte[]>();
 

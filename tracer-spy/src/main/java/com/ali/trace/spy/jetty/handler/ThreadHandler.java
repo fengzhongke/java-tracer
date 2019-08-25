@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ThreadHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/thread", order = 10)

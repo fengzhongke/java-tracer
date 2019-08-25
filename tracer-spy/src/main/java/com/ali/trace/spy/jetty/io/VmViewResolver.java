@@ -8,6 +8,9 @@ import java.io.Writer;
 import java.util.Map;
 import java.util.Properties;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class VmViewResolver {
   private static VelocityEngine ve = new VelocityEngine();
   static{

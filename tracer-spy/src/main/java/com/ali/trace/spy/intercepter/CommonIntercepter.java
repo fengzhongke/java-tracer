@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Stack;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class CommonIntercepter extends BaseIntercepter {
 
 	private final long start = System.currentTimeMillis();

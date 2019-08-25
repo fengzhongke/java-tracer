@@ -2,6 +2,9 @@ package com.ali.trace.spy.util;
 
 import java.lang.reflect.Method;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ClassUtils {
 
     public static void main(String[] args) throws Exception {

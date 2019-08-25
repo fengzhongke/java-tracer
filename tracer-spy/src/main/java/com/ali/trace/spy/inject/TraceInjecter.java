@@ -13,10 +13,12 @@ import org.objectweb.asm.commons.Method;
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.jetty.JettyServer;
 
+import java.lang.instrument.Instrumentation;
+
 /**
  * trace code inject
  *
- * @author hanlang.hl
+ * @author nkhanlang@163.com
  *
  */
 public class TraceInjecter {
@@ -24,13 +26,16 @@ public class TraceInjecter {
     private final Type TYPE;
     private final Method START;
     private final Method END;
+    private final ConfigPool POOL = ConfigPool.getPool();
 
-    public TraceInjecter(Class<?> clasz, int port) throws NoSuchMethodException, SecurityException {
+    public TraceInjecter(Instrumentation inst, Class<?> clasz, int port) throws NoSuchMethodException, SecurityException {
+
         LOADER = getClass().getClassLoader();
         TYPE = Type.getType(clasz);
         START = Method.getMethod(clasz.getMethod("s", new Class<?>[] {String.class, String.class}));
         END = Method.getMethod(clasz.getMethod("e", new Class<?>[] {String.class, String.class}));
-        ConfigPool.getPool().setWeaveClass(clasz);
+        POOL.setInst(inst);
+        POOL.setWeaveClass(clasz);
         new JettyServer(port);
     }
 
@@ -42,17 +47,21 @@ public class TraceInjecter {
                     && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")
                 && !name.startsWith("com/google/gson/internal/reflect/ReflectionAccessor"))
                     || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
-                    bytes = new CodeReader(loader, name, bytes).getBytes();
+                    bytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name)).getBytes();
                     type = 1;
                 }
             }
             return bytes;
+        } catch (TypeNotPresentException e) {
+            type = 3;
+            throw e;
         } catch (Throwable t) {
             type = 2;
+            t.printStackTrace();
             throw t;
         } finally {
             if (name != null) {
-                ConfigPool.getPool().addClass(loader, name, type);
+                POOL.addClass(loader, name, type);
             }
         }
     }
@@ -60,10 +69,9 @@ public class TraceInjecter {
     class CodeReader extends ClassReader {
         private final ClassWriter classWriter;
 
-        public CodeReader(final ClassLoader loader, final String name, byte[] bytes) {
+        public CodeReader(final ClassLoader loader, final String name, byte[] bytes, final boolean redefine) {
             super(bytes);
             classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
-
                 @Override
                 public ClassLoader getClassLoader() {
                     return loader;
@@ -71,20 +79,21 @@ public class TraceInjecter {
 
                 @Override
                 protected String getCommonSuperClass(final String type1, final String type2) {
-                    if (name.equals(type1)) {
-                        throw new TypeNotPresentException(type1,
-                            new Exception("circular define 1:[" + type1 + "," + type2 + "]"));
-                    }
-                    if (name.equals(type2)) {
-                        throw new TypeNotPresentException(type2,
-                            new Exception("circular define 2:[" + type1 + "," + type2 + "]"));
+                    if(!redefine) {
+                        if (name.equals(type1)) {
+                            throw new TypeNotPresentException(type1,
+                                    new Exception("circular define 1:[" + type1 + "," + type2 + "]"));
+                        }
+                        if (name.equals(type2)) {
+                            throw new TypeNotPresentException(type2,
+                                    new Exception("circular define 2:[" + type1 + "," + type2 + "]"));
+                        }
                     }
                     return super.getCommonSuperClass(type1, type2);
                 }
             };
             accept(new CodeVisitor(classWriter), EXPAND_FRAMES);
         }
-
         /**
          * return modified bytes
          */

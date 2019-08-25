@@ -5,6 +5,9 @@ import com.ali.trace.spy.util.TreeNode;
 
 import java.util.Stack;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ThreadCompressIntercepter extends BaseIntercepter {
 
     private final String c;

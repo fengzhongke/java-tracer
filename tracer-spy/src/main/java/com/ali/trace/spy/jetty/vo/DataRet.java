@@ -12,7 +12,7 @@ import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
 
 /**
- * @auther hanlang@mallcai.com
+ * @author nkhanlang@163.com
  * @date 2019-08-21 00:52
  */
 

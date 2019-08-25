@@ -1,5 +1,8 @@
 package com.ali.trace.spy.helper;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class ThreadFileNameGenerator implements IFileNameGenerator {
 
 	private String path;

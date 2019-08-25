@@ -2,8 +2,8 @@ package com.ali.trace.spy.intercepter;
 
 /**
  * do around method except exception
- * 
- * @author hanlang.hl
+ *
+ * @author nkhanlang@163.com
  *
  */
 public interface IIntercepter {

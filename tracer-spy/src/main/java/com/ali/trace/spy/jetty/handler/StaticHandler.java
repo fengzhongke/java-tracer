@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.regex.Pattern;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class StaticHandler implements ITraceHttpHandler {
 
     @TracerPath(value="/static/((js)|(css))/.*", order=100)

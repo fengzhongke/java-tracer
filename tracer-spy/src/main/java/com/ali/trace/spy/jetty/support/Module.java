@@ -5,9 +5,8 @@ import com.ali.trace.spy.jetty.handler.ITraceHttpHandler;
 
 import java.lang.reflect.Method;
 import java.util.regex.Pattern;
-
 /**
- * @auther hanlang@mallcai.com
+ * @author nkhanlang@163.com
  * @date 2019-08-21 23:30
  */
 public class Module implements Comparable<Module> {

@@ -12,6 +12,9 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Stack;
 
+/**
+ * @author nkhanlang@163.com
+ */
 public class SelectiveFilter {
 
 	public static void main(String[] args) throws Exception {
