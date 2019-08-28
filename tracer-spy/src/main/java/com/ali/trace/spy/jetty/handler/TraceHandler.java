@@ -2,13 +2,16 @@ package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.NodePool;
-import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
+import com.ali.trace.spy.intercepter.BaseTreeIntercepter;
+import com.ali.trace.spy.intercepter.CommonTreeIntercepter;
+import com.ali.trace.spy.intercepter.CompressTreeIntercepter;
 import com.ali.trace.spy.jetty.vo.DataRet;
 import com.ali.trace.spy.jetty.vo.MetaVO;
 import com.ali.trace.spy.jetty.vo.RecordVO;
 import com.ali.trace.spy.jetty.vo.SetVO;
 import com.ali.trace.spy.jetty.vo.TraceVO;
-import com.ali.trace.spy.util.TreeNode;
+import com.ali.trace.spy.util.BaseNode;
+import com.ali.trace.spy.util.CompressNode;
 import org.apache.commons.lang.math.NumberUtils;
 
 import java.io.IOException;
@@ -22,20 +25,25 @@ import java.util.Map;
  */
 public class TraceHandler implements ITraceHttpHandler {
 
-    private volatile ThreadCompressIntercepter intercepter;
+    private volatile BaseTreeIntercepter intercepter;
     private final NodePool nodePool = NodePool.getPool();
 
     @TracerPath(value = "/trace/set", order = 1)
     public DataRet<String> set(PrintWriter writer, @TraceParam("class") String cname,
                        @TraceParam("method") String mname,
-                       @TraceParam("size") String sizeStr) throws IOException {
+                               @TraceParam("size") String sizeStr,
+                               @TraceParam("type") String type) throws IOException {
         DataRet<String> ret = null;
         try {
             if (NumberUtils.isDigits(sizeStr)) {
                 nodePool.setSize(Integer.valueOf(sizeStr));
             }
             if (cname != null && mname != null) {
-                intercepter = new ThreadCompressIntercepter(cname, mname);
+                if(type.equalsIgnoreCase("common")){
+                    intercepter = new CommonTreeIntercepter(cname, mname);
+                }else {
+                    intercepter = new CompressTreeIntercepter(cname, mname);
+                }
                 ConfigPool.getPool().setIntercepter(intercepter);
             }else{
                 ConfigPool.getPool().delIntercepter();
@@ -76,7 +84,7 @@ public class TraceHandler implements ITraceHttpHandler {
             Map<Long, Long> nodes = nodePool.getNodes();
             for (Map.Entry<Long, Long> entry : nodes.entrySet()) {
                 long seed = entry.getKey();
-                String[] names = TreeNode.getName(entry.getValue());
+                String[] names = CompressNode.getName(entry.getValue());
                 list.add(new RecordVO(seed, new MetaVO(names[0], names[1])));
             }
             ret = new DataRet<List<RecordVO>>(true, 0, "get ok");
@@ -92,7 +100,7 @@ public class TraceHandler implements ITraceHttpHandler {
         DataRet<TraceVO> ret = null;
         try {
             Long seed = Long.valueOf(id);
-            TreeNode node = nodePool.getNode(seed);
+            BaseNode node = nodePool.getNode(seed);
             Map<Long, String[]> metas = node.getMetas();
             ret = new DataRet<TraceVO>(true, 0, "getjson id:[" + id + "]success");
             ret.setData(new TraceVO(node, metas));
@@ -106,7 +114,7 @@ public class TraceHandler implements ITraceHttpHandler {
     public void get(@TraceParam("id") String id, PrintWriter writer) throws IOException, InterruptedException {
         Long seed = Long.valueOf(id);
         if (intercepter != null) {
-            TreeNode node = nodePool.getNode(seed);
+            BaseNode node = nodePool.getNode(seed);
             if (node != null) {
                 writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
                 node.writeFile(writer);

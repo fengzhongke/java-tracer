@@ -7,7 +7,7 @@ import java.util.Map;
 import com.ali.trace.agent.inject.TraceEnhance;
 import com.ali.trace.spy.intercepter.CommonIntercepter;
 import com.ali.trace.spy.intercepter.CompressIntercepter;
-import com.ali.trace.spy.intercepter.ThreadCompressIntercepter;
+import com.ali.trace.spy.intercepter.CompressTreeIntercepter;
 import com.ali.trace.spy.intercepter.ThreadIntercepter;
 /**
  * @author nkhanlang@163.com
@@ -43,7 +43,7 @@ public class CoreEngine {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);
             System.out.println("class:[" + clasz + "]method:[" + method + "]");
-            TraceEnhance.setIntecepter(new ThreadCompressIntercepter(clasz, method));
+            TraceEnhance.setIntecepter(new CompressTreeIntercepter(clasz, method));
         } else if ("thread".equals(intercepter)) {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);

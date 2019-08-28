@@ -1,6 +1,6 @@
 package com.ali.trace.spy.core;
 
-import com.ali.trace.spy.util.TreeNode;
+import com.ali.trace.spy.util.BaseNode;
 import javafx.util.Pair;
 
 import java.util.HashMap;
@@ -19,7 +19,7 @@ public class NodePool {
     private static final AtomicLong MIN = new AtomicLong(0L);
     private static final NodePool INSTANCE = new NodePool();
 
-    private final Map<Long, TreeNode> POOL = new ConcurrentHashMap<Long, TreeNode>();
+    private final Map<Long, BaseNode> POOL = new ConcurrentHashMap<Long, BaseNode>();
     private final LinkedBlockingQueue<Pair<Long, Long>> QUEUE = new LinkedBlockingQueue<Pair<Long, Long>>();
 
     private volatile long size = 5;
@@ -27,7 +27,7 @@ public class NodePool {
         return INSTANCE;
     }
 
-    public TreeNode getNode(Long seed){
+    public BaseNode getNode(Long seed){
         return POOL.get(seed);
     }
 
@@ -55,7 +55,7 @@ public class NodePool {
         return map;
     }
 
-    public void addNode(TreeNode node){
+    public void addNode(BaseNode node){
         long seed = MAX.incrementAndGet();
         while(seed - MIN.get() > size) {
             Pair<Long, Long> expire = QUEUE.poll();

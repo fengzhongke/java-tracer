@@ -1,6 +1,6 @@
 package com.ali.trace.spy.jetty.vo;
 
-import com.ali.trace.spy.util.TreeNode;
+import com.ali.trace.spy.util.CompressNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -61,14 +61,14 @@ public class DataRet<T> {
 
 
     public static void main(String[] args) {
-        long id = TreeNode.getId("com.test.Service", "main");
-        TreeNode node = new TreeNode(id);
-        node.addSon(TreeNode.getId("com.test.Service", "main1"), 1L);
-        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L);
-        node.addSon(TreeNode.getId("com.test.Service1", "main"), 1L)
-                .addSon(TreeNode.getId("com.test.Service1", "main"), 1L)
-                .addSon(TreeNode.getId("com.test.Service", "main"), 1L);
-        DataRet<TreeNode> ret = new DataRet<TreeNode>(true, 0, "");
+        long id = CompressNode.getId("com.test.Service", "main");
+        CompressNode node = new CompressNode(id);
+        node.addSon(CompressNode.getId("com.test.Service", "main1"));
+        node.addSon(CompressNode.getId("com.test.Service1", "main"));
+        node.addSon(CompressNode.getId("com.test.Service1", "main"))
+                .addSon(CompressNode.getId("com.test.Service1", "main"))
+                .addSon(CompressNode.getId("com.test.Service", "main"));
+        DataRet<CompressNode> ret = new DataRet<CompressNode>(true, 0, "");
         ret.setData(node);
 
 

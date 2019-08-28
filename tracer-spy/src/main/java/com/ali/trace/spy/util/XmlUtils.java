@@ -78,8 +78,8 @@ public class XmlUtils {
     
     public static void stasticXml(List<String> fileNames, String newFile) throws Exception{
 
-        TreeNode root = new TreeNode(TreeNode.getId("test", "root"));
-        Stack<TreeNode> stack = new Stack<TreeNode>();
+        CompressNode root = new CompressNode(CompressNode.getId("test", "root"));
+        Stack<CompressNode> stack = new Stack<CompressNode>();
         stack.push(root);
         for(String fileName : fileNames){
             BufferedReader reader = null;
@@ -92,13 +92,13 @@ public class XmlUtils {
                         String[] items = line.split("<|'| ");
                         String m = items[1];
                         if (m.charAt(0) == '/') {
-                            TreeNode son = stack.pop();
+                            CompressNode son = stack.pop();
                             Long rt = Long.valueOf(items[3]);
                             son.addRt(rt);
                         } else {
                             String c = items[items.length - 2];
                             cs.push(c);
-                            stack.push(stack.peek().addSon(TreeNode.getId(c, m), 1L));
+                            stack.push(stack.peek().addSon(BaseNode.getId(c, m)));
                         }
                     }
                 }

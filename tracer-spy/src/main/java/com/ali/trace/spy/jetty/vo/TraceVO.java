@@ -1,6 +1,7 @@
 package com.ali.trace.spy.jetty.vo;
 
-import com.ali.trace.spy.util.TreeNode;
+import com.ali.trace.spy.util.BaseNode;
+import com.ali.trace.spy.util.CompressNode;
 
 import java.util.Map;
 
@@ -9,18 +10,18 @@ import java.util.Map;
  * @date 2019-08-21 00:51
  */
 public class TraceVO {
-    private TreeNode node;
+    private BaseNode node;
     private Map<Long, String[]> metas;
 
-    public TraceVO(TreeNode node, Map<Long, String[]> metas){
+    public TraceVO(BaseNode node, Map<Long, String[]> metas){
         this.node = node;
         this.metas = metas;
     }
-    public TreeNode getNode() {
+    public BaseNode getNode() {
         return node;
     }
 
-    public void setNode(TreeNode node) {
+    public void setNode(BaseNode node) {
         this.node = node;
     }
 
