@@ -1,0 +1,132 @@
+<head>
+    <title></title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css">
+</head>
+
+<body>
+    <div class="row clearfix">
+        <div class="col-md-12 column">
+            <nav class="navbar navbar-inverse" role="navigation">
+                <div class="container-fluid">
+                    <div class="navbar-header">
+                        <a class="navbar-brand" href="/">java-tracer</a>
+                    </div>
+                    <div>
+                        <ul class="nav navbar-nav">
+                            <li class="active"><a href="/index">home</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="list-group">
+            <a class="list-group-item active">
+                <h4 class="list-group-item-heading">
+                    system info
+                </h4>
+            </a>
+            <div class="list-group-item" target="_blank">
+                <div class="row clearfix list-item-inline">
+                    <div class="col-md-1 column btn-group-sm">
+                        <a href="/class" class="btn btn-success" target="_blank">forward</a>
+                    </div>
+                    <div class="col-md-10 column">
+                        <label class="form-control">classLoader & class</label>
+                    </div>
+                </div>
+            </div>
+            <div class="list-group-item" target="_blank">
+                <div class="row clearfix">
+                    <div class="col-md-1 column  btn-group-sm">
+                        <a href="/thread" class="btn btn-success" target="_blank">forward</a>
+                    </div>
+                    <div class="col-md-10 column">
+                        <label class="form-control">thread</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="list-group">
+            <a href="#" class="list-group-item active">
+                <h4 class="list-group-item-heading">
+                    method trace
+                </h4>
+            </a>
+            <div class="list-group-item" id="form_set">
+                <div class="row clearfix">
+                    <div class="col-md-6 column">
+                        <div class="input-group">
+                            <span class="input-group-addon">method:</span>
+                            <label type="text" class="form-control" name="cname_mname"></label>
+                        </div>
+                    </div>
+                    <div class="col-md-2 column">
+                        <div class="input-group">
+                            <span class="input-group-addon">size:</span>
+                            <label type="text" class="form-control" name="size"></label>
+                        </div>
+                    </div>
+                </div>
+                <br>
+                <div class="btn-group-sm">
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#myModal" id="set">set</button>
+                    <button class="btn btn-success" id="refresh">refresh</button>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <ul class="list-group" id="form_list">
+                    <li class="list-demo">
+                        <div class="row clearfix">
+                            <div class="col-md-1 column btn-group-sm">
+                                <a class="btn btn-success" id="form_href" target="_blank">forward</a>
+                            </div>
+                            <div class="col-md-10 column">
+                                <label class="form-control" name="cname_mname"></label>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                    <h4 class="modal-title" id="myModalLabel">set method to trace</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <div class="input-group">
+                            <span class="input-group-addon">cname</span>
+                            <input type="text" class="form-control" placeholder="class name" name="model_cname">
+                        </div>
+                        <br>
+                        <div class="input-group">
+                            <span class="input-group-addon">mname</span>
+                            <input type="text" class="form-control" placeholder="method name" name="model_mname">
+                        </div>
+                        <br>
+                        <div class="input-group">
+                            <span class="input-group-addon">size</span>
+                            <input type="text" class="form-control" placeholder="result count" name="model_size">
+                        </div>
+                        <br>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="confirm">submit</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal -->
+    </div>
+    <script src="/static/js/home.js"></script>
+</body>
+</html>
