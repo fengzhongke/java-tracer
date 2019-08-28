@@ -14,11 +14,11 @@
             <nav class="navbar navbar-inverse" role="navigation">
                 <div class="container-fluid">
                     <div class="navbar-header">
-                        <a class="navbar-brand" href="/">java-tracer</a>
+                        <a class="navbar-brand" href="#">java-tracer</a>
                     </div>
                     <div>
                         <ul class="nav navbar-nav">
-                            <li class="active"><a href="/index">home</a></li>
+                            <li class="active"><a href="#">home</a></li>
                         </ul>
                     </div>
                 </div>
@@ -27,7 +27,7 @@
     </div>
     <div class="container">
         <div class="row">
-            <div class="col-sm-3">
+            <div class="col-sm-4">
                 <div class="input-group">
                     <span class="btn btn-default input-group-addon sequence-op" name="fast-back" data-toggle="tooltip" data-placement="left" title="back to init">
                         <i class=" glyphicon glyphicon-fast-backward"></i>
@@ -44,15 +44,18 @@
                             <i class="glyphicon glyphicon-chevron-down"></i>
                         </span>
                     </div>
-                    <!--
-                    <span class="btn btn-default input-group-addon sequence-op" name="filter-classes" data-toggle="modal" data-target="#myModal">
+                    <span class="btn btn-default input-group-addon sequence-op" name="filter-classes" data-toggle="modal" data-target="#packageModel">
                         <span data-toggle="tooltip" data-placement="bottom" title="filter classes">
                             <i class=" glyphicon glyphicon-filter"></i>
                         </span>
                     </span>
-                    -->
-                    <span class="btn btn-default input-group-addon">
-                        <a href="/trace/get.xml?id=${id}" target="_blank"> xml </a>
+                    <span class="btn btn-default input-group-addon sequence-op" name="filter-classes" data-toggle="modal" data-target="#classModel">
+                        <span data-toggle="tooltip" data-placement="bottom" title="class list">
+                            <i class=" glyphicon glyphicon-list"></i>
+                        </span>
+                    </span>
+                    <span class="btn btn-default input-group-addon" target>
+                        <a href=""> xml </a>
                     </span>
                 </div>
             </div>
@@ -60,40 +63,46 @@
         <br>
         <div class="row clearfix">
             <div class="col-md-12 column">
-                <div class="jumbotron" style="overflow: scroll;">
+                <div class="jumbotron big-content">
                     <div id="sequence"></div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+
+
+    <div class="modal fade" id="packageModel" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-                    <h4 class="modal-title" id="myModalLabel">set method to trace</h4>
+                    <h4 class="modal-title" id="myModalLabel">set packages to ignore</h4>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <div class="input-group">
-                            <span class="input-group-addon">cname</span>
-                            <input type="text" class="form-control" placeholder="class name" name="model_cname">
-                        </div>
-                        <br>
-                        <div class="input-group">
-                            <span class="input-group-addon">mname</span>
-                            <input type="text" class="form-control" placeholder="method name" name="model_mname">
-                        </div>
-                        <br>
-                        <div class="input-group">
-                            <span class="input-group-addon">size</span>
-                            <input type="text" class="form-control" placeholder="result count" name="model_size">
-                        </div>
-                        <br>
+                    <div class="jumbotron big-content">
+                        <div id="packages"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="confirm">submit</button>
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirm">ok</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal -->
+    </div>
+    <div class="modal fade" id="classModel" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                    <h4 class="modal-title" id="myModalLabel">class list</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="jumbotron big-content">
+                        <div id="classes"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirm">ok</button>
                 </div>
             </div><!-- /.modal-content -->
         </div><!-- /.modal -->

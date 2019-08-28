@@ -40,3 +40,14 @@
     left: 4px;
 }
 svg tspan { cursor:pointer }
+ul.tree-list-group{
+    list-style:none;
+    text-indent:-3px;
+    padding:0px;
+    padding-left:20px;
+    margin:0px;
+}
+
+.big-content{
+    overflow: scroll;
+}
