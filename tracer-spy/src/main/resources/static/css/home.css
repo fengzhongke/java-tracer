@@ -1,4 +1,8 @@
 .input-group-addon{
+    min-width:100px;
+    text-align: left;
+}
+.sequence-op{
     min-width:50px;
 }
 .list-demo{

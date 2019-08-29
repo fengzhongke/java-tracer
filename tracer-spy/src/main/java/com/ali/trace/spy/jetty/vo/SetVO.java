@@ -6,10 +6,12 @@ package com.ali.trace.spy.jetty.vo;
  */
 public class SetVO {
     private MetaVO metaVO;
+    private String type;
     private long size;
 
-    public SetVO(MetaVO metaVO, long size){
+    public SetVO(MetaVO metaVO, String type, long size){
         this.metaVO = metaVO;
+        this.type = type;
         this.size = size;
     }
     public MetaVO getMetaVO() {
@@ -26,5 +28,13 @@ public class SetVO {
 
     public void setSize(long size) {
         this.size = size;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

@@ -60,17 +60,27 @@
             </a>
             <div class="list-group-item" id="form_set">
                 <div class="row clearfix">
-                    <div class="col-md-6 column">
-                        <div class="input-group">
-                            <span class="input-group-addon">method:</span>
-                            <label type="text" class="form-control" name="cname_mname"></label>
-                        </div>
+                    <div class="input-group col-md-7">
+                        <span class="input-group-addon">cname:</span>
+                        <label type="text" class="form-control" name="cname"></label>
                     </div>
-                    <div class="col-md-2 column">
-                        <div class="input-group">
-                            <span class="input-group-addon">size:</span>
-                            <label type="text" class="form-control" name="size"></label>
-                        </div>
+                </div>
+                <div class="row clearfix">
+                    <div class="input-group col-md-7">
+                        <span class="input-group-addon">mname:</span>
+                        <label type="text" class="form-control" name="mname"></label>
+                    </div>
+                </div>
+                <div class="row clearfix">
+                    <div class="input-group col-md-7">
+                        <span class="input-group-addon">type:</span>
+                        <label type="text" class="form-control" name="type"></label>
+                    </div>
+                </div>
+                <div class="row clearfix">
+                    <div class="input-group col-md-7">
+                        <span class="input-group-addon">size:</span>
+                        <label type="text" class="form-control" name="size"></label>
                     </div>
                 </div>
                 <br>
@@ -83,10 +93,11 @@
                 <ul class="list-group" id="form_list">
                     <li class="list-demo">
                         <div class="row clearfix">
-                            <div class="col-md-1 column btn-group-sm">
-                                <a class="btn btn-success" id="form_href" target="_blank">forward</a>
+                            <div class="col-md-4 column btn-group-sm"><div class=" input-group">
+                                <a class="btn btn-success btn-group-sm  input-group-addon" id="form_href" target="_blank" href="/trace?id=1">forward</a>
+                                <label class="form-control" name="type">CommonTreeIntercepter</label></div>
                             </div>
-                            <div class="col-md-10 column">
+                            <div class="col-md-8 column">
                                 <label class="form-control" name="cname_mname"></label>
                             </div>
                         </div>
@@ -112,6 +123,14 @@
                         <div class="input-group">
                             <span class="input-group-addon">mname</span>
                             <input type="text" class="form-control" placeholder="method name" name="model_mname">
+                        </div>
+                        <br>
+                        <div class="input-group">
+                            <span class="input-group-addon">type</span>
+                            <select class="form-control" name="model_type">
+                                <option value="CompressTreeIntercepter">CompressTreeIntercepter</option>
+                                <option value="CommonTreeIntercepter">CommonTreeIntercepter</option>
+                            </select>
                         </div>
                         <br>
                         <div class="input-group">

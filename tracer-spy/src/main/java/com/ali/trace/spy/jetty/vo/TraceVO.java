@@ -10,13 +10,24 @@ import java.util.Map;
  * @date 2019-08-21 00:51
  */
 public class TraceVO {
+    private String type;
     private BaseNode node;
     private Map<Long, String[]> metas;
 
-    public TraceVO(BaseNode node, Map<Long, String[]> metas){
+    public TraceVO(String type, BaseNode node, Map<Long, String[]> metas){
+        this.type = type;
         this.node = node;
         this.metas = metas;
     }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
     public BaseNode getNode() {
         return node;
     }

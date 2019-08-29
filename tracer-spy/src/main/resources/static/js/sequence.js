@@ -60,7 +60,8 @@ function TreeNode(name, arr, meta){
     }
 }
 
-function Meta(node, metas){
+function Meta(type, node, metas){
+    this.type = type;
     this.node = node;
     this.metas = metas;
     this.arr = {};
@@ -114,11 +115,15 @@ function DynSeq(parent, node, meta){
                 break;
             }
         }
+        if(idx >= len){
+            idx = str.lastIndexOf('.');
+        }
         return str.substr(idx);
         //return str.substr(str.lastIndexOf('.')+1);
     };
     this.setActor = function(cname, name){
         if(!this.set.hasOwnProperty(name)){
+            console.log(cname , name);
             this.set[name] = cname;
             this.classes[name] = cname;
             return "Participant " + name + " [cname='" + cname + "',fillcolor='#fed', type='actor']";
@@ -144,7 +149,7 @@ function DynSeq(parent, node, meta){
                     if(s.hasOwnProperty('s')){
                         for(var j in s.s){
                             var g = s.s[j];
-                            if(m.hasOwnProperty(g.i)){
+                            if(m.hasOwnProperty(g.i) && this.meta.type == "CompressTreeIntercepter"){
                                 m[g.i].t += g.t;
                                 m[g.i].c += g.c;
                             }else{
@@ -154,7 +159,7 @@ function DynSeq(parent, node, meta){
                         }
                     }
                 }else{
-                    if(m.hasOwnProperty(s.i)){
+                    if(m.hasOwnProperty(s.i) && this.meta.type == "CompressTreeIntercepter"){
                         m[s.i].t += s.t;
                         m[s.i].c += s.c;
                     }else{
@@ -180,13 +185,8 @@ function DynSeq(parent, node, meta){
         if(idx != -1){
             p = path.substr(0, idx);
         }
-        for(var i in n.s){
-            if(n.s[i].i == p){
-                return idx != -1 ? this.getNode(path.substr(idx+1), n.s[i]) : n.s[i];
-            }
-        }
-        if(idx != -1 && n.i == p){
-            return this.getNode(path.substr(idx+1), n);
+        if(n.hasOwnProperty('s') && n.s.length > p){
+            return idx != -1 ? this.getNode(path.substr(idx+1), n.s[p]) : n.s[p];
         }
         return n;
     };
@@ -220,10 +220,10 @@ function DynSeq(parent, node, meta){
                     lines.push(dstActor);
                 }
                 var nextInvoke = invoke ? (invoke + "." + (parseInt(i)+1)) : ("" + (parseInt(i)+1));
-                var subLines = this.getLines(son, path + "/" + son.i, depth-1, count+1, nextInvoke);
+                var subLines = this.getLines(son, path + "/" + i, depth-1, count+1, nextInvoke);
 
                 var id = "id='" + son.i + "'";
-                var pa = "path='" + path + "/" + son.i + "'";
+                var pa = "path='" + path + "/" + i + "'";
 
                 var cnt = son.c > 1 ? ":cnt:" + son.c : "";
                 var rt = son.t > 1 ? ":rt:" + son.t : "";
@@ -259,8 +259,8 @@ function DynSeq(parent, node, meta){
     }
 }
 
-function Chart(node, metas){
-    this.meta = new Meta(node, metas);
+function Chart(type, node, metas){
+    this.meta = new Meta(type, node, metas);
     this.seq = new DynSeq(null, node, this.meta);
     this.getSetDepth = function(cnt){
         var val = parseInt($('.sequence-op[name=depth-value]').val());
@@ -319,7 +319,7 @@ var init = function(id){
     $.post("/trace/get.json", {id:id}, function(str){
         var ret = JSON.parse(str);
         if(ret.status){
-            chart = new Chart(ret.data.node, ret.data.metas)
+            chart = new Chart(ret.data.type, ret.data.node, ret.data.metas)
         }
     });
 }

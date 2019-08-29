@@ -6,10 +6,12 @@ package com.ali.trace.spy.jetty.vo;
  */
 public class RecordVO {
     private MetaVO metaVO;
+    private String type;
     private Long seed;
 
-    public RecordVO(long seed, MetaVO metaVO){
+    public RecordVO(long seed, String type, MetaVO metaVO){
         this.seed = seed;
+        this.type = type;
         this.metaVO = metaVO;
     }
 
@@ -27,5 +29,13 @@ public class RecordVO {
 
     public void setSeed(Long seed) {
         this.seed = seed;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

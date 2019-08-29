@@ -5,10 +5,12 @@ $('#refresh').click(function(){
         var ret = JSON.parse(str);
         if(ret.status){
             data = ret.data;
-            $('label[name=size]').html(data.size);
             if(data.metaVO.hasOwnProperty('cname') && data.metaVO.hasOwnProperty('mname')){
-                $('label[name=cname_mname]', $('#form_set')).html(data.metaVO.cname + "." + data.metaVO.mname);
+                $('label[name=cname]', $('#form_set')).html(data.metaVO.cname);
+                $('label[name=mname]', $('#form_set')).html(data.metaVO.mname);
+                $('label[name=type]', $('#form_set')).html(data.type);
             }
+            $('label[name=size]', $('#form_set')).html(data.size);
         }
     });
     $.post("/trace/list", function(str){
@@ -22,6 +24,7 @@ $('#refresh').click(function(){
                 li.removeClass('list-demo');
                 li.addClass('list-group-item');
                 $('#form_href', li).attr('href', '/trace?id=' + item.seed);
+                $('label[name=type]', li).html(item.type);
                 $('label[name=cname_mname]', li).html(item.metaVO.cname + "." + item.metaVO.mname);
                 demo.after(li);
             }
@@ -33,6 +36,7 @@ $('#set').click(function(){
     if(data){
         $('input[name=model_cname]').val(data.metaVO.cname);
         $('input[name=model_mname]').val(data.metaVO.mname);
+        $('input[name=model_type]').val(data.type);
         $('input[name=model_size]').val(data.size);
     }
 });
@@ -40,9 +44,10 @@ $('#set').click(function(){
 $('#confirm').click(function(){
     var cname = $('input[name=model_cname]').val();
     var mname = $('input[name=model_mname]').val();
+    var type = $('input[name=model_type]').val();
     var size = $('input[name=model_size]').val();
-    if(confirm("set class:[" + cname + "]method:[" + mname + "]size:[" + size + "] ? ")){
-        $.post("/trace/set", {class:cname, method:mname, size:size}, function(str){
+    if(confirm("set class:[" + cname + "]method:[" + mname + "] type:[" + type + "] size:[" + size + "] ? ")){
+        $.post("/trace/set", {class:cname, method:mname, type:type, size:size}, function(str){
             var ret = JSON.parse(str);
             if(ret.status){
                 alert("set sucess!");
