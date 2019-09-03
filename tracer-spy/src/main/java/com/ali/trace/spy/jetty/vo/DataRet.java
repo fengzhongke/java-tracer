@@ -1,14 +1,10 @@
 package com.ali.trace.spy.jetty.vo;
 
 import com.ali.trace.spy.util.CompressNode;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
+import com.google.gson.*;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
 /**
@@ -55,7 +51,11 @@ public class DataRet<T> {
 
     private static Gson gson = new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, new JsonSerializer<LinkedHashMap>() {
         public JsonElement serialize(LinkedHashMap src, Type typeOfSrc, JsonSerializationContext context) {
-            return !src.isEmpty() ? gson.toJsonTree(src.values()): JsonNull.INSTANCE;
+            return !src.isEmpty() ? gson.toJsonTree(src.values()) : JsonNull.INSTANCE;
+        }
+    }).registerTypeAdapter(ArrayList.class, new JsonSerializer<ArrayList>() {
+        public JsonElement serialize(ArrayList src, Type typeOfSrc, JsonSerializationContext context) {
+            return !src.isEmpty() ? gson.toJsonTree(src.toArray()) : JsonNull.INSTANCE;
         }
     }).create();
 

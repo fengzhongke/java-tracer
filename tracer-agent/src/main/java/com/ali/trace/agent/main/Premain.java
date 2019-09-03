@@ -32,7 +32,7 @@ public class Premain {
     private static final String CONFIG_SLEEP="sleep";
 
 
-    private static final SpyClassLoader LOADER = new SpyClassLoader(ClassLoader.getSystemClassLoader());
+    private static final SpyClassLoader LOADER = new SpyClassLoader(null);
     private static final AtomicReference<Object> INJECT = new AtomicReference<Object>();
 
     public static void premain(String args, Instrumentation inst) {

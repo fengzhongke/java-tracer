@@ -1,6 +1,10 @@
 package com.ali.trace.spy.util;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -12,36 +16,41 @@ import java.util.*;
 /**
  * @author nkhanlang@163.com
  */
-public class CommonNode extends BaseNode<CommonNode> {
+public class CompressNode extends BaseNode<CompressNode> {
 
-    private ArrayList<CommonNode> s = new ArrayList<CommonNode>();
+    private long c;
+    private LinkedHashMap<Long, CompressNode> s = new LinkedHashMap<Long, CompressNode>();
 
-    public CommonNode(long id) {
+    public CompressNode(long id) {
         super(id);
     }
 
-    public CommonNode addSon(long id) {
-        CommonNode son = new CommonNode(id);
-        s.add(son);
+    public CompressNode addSon(long id) {
+        CompressNode son = s.get(id);
+        if (son == null) {
+            s.put(id, son = new CompressNode(id));
+        }
+        son.c ++;
         return son;
     }
 
-    public Collection<CommonNode> getSons() {
-        return new ArrayList<CommonNode>(s);
+    public Collection<CompressNode> getSons() {
+        return new ArrayList<CompressNode>(s.values());
     }
-
 
     public void writeFile(Writer writer, int depth) throws IOException {
         if (depth > 0) {
-            String[] items =getName(i);
+            String[] items = getName(i);
             if (items == null) {
                 throw new RuntimeException("name not exists ![" + i + "]");
             }
             writer.write("<");
             writer.write(items[1]);
+            writer.write(" cnt='" + c + "'");
             writer.write(" rt='" + t + "'");
+            writer.write(" c='" + items[0] + "'");
             writer.write(">\r\n");
-            for (CommonNode son : s) {
+            for (CompressNode son : s.values()) {
                 son.writeFile(writer, depth--);
             }
             writer.write("</");
@@ -51,13 +60,13 @@ public class CommonNode extends BaseNode<CommonNode> {
     }
 
     public static void main(String[] args) throws IOException {
-        long id = CommonNode.getId("com.test.Service", "main");
-        CommonNode node = new CommonNode(id);
-        node.addSon(CommonNode.getId("com.test.Service", "main1"));
-        node.addSon(CommonNode.getId("com.test.Service1", "main"));
-        node.addSon(CommonNode.getId("com.test.Service1", "main"))
-                .addSon(CommonNode.getId("com.test.Service1", "main"))
-                .addSon(CommonNode.getId("com.test.Service", "main"));
+        long id = CompressNode.getId("com.test.Service", "main");
+        CompressNode node = new CompressNode(id);
+        node.addSon(CompressNode.getId("com.test.Service", "main1"));
+        node.addSon(CompressNode.getId("com.test.Service1", "main"));
+        node.addSon(CompressNode.getId("com.test.Service1", "main"))
+                .addSon(CompressNode.getId("com.test.Service1", "main"))
+                .addSon(CompressNode.getId("com.test.Service", "main"));
         BufferedWriter writer = null;
         try {
             writer = new BufferedWriter(new FileWriter("/tmp/test.xml"));

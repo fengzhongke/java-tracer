@@ -137,7 +137,7 @@ public class TraceInjecter {
 
             public FinallyAdapter(MethodVisitor methodVisitor, int acc, String name, String desc) {
                 super(Opcodes.ASM7, methodVisitor, acc, name, desc);
-                this.mName = name.replaceAll("<", "_").replaceAll(">|\\$", "");
+                this.mName = name.replaceAll("<", "_").replaceAll("\\$|>", "");
             }
 
             @Override
