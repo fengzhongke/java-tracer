@@ -14,7 +14,7 @@ import java.util.*;
  */
 public class CommonNode extends BaseNode<CommonNode> {
 
-    private List<CommonNode> s = new ArrayList<CommonNode>();
+    private ArrayList<CommonNode> s = new ArrayList<CommonNode>();
 
     public CommonNode(long id) {
         super(id);

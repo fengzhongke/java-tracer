@@ -10,7 +10,6 @@ public class RootNode {
     private final BaseNode node;
     private final long start;
 
-
     public RootNode(long id, BaseNode node, String type) {
         this.id = id;
         this.node = node;
