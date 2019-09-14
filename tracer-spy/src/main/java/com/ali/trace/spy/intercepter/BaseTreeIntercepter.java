@@ -37,7 +37,7 @@ public abstract class BaseTreeIntercepter<T extends BaseNode> extends BaseInterc
 			if (stack == null) {
 				t_stack.set(stack = new Stack<T>());
 				T node = getNode(BaseNode.getId(c, m));
-				nodePool.addNode(node);
+				nodePool.addNode(node, getClass().getSimpleName());
 				stack.add(node);
 				t_time.set(time = new Stack<Long>());
 			}

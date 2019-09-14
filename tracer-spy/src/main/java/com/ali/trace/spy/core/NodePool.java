@@ -1,7 +1,7 @@
 package com.ali.trace.spy.core;
 
 import com.ali.trace.spy.util.BaseNode;
-import javafx.util.Pair;
+import com.ali.trace.spy.util.RootNode;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,24 +19,24 @@ public class NodePool {
     private static final AtomicLong MIN = new AtomicLong(0L);
     private static final NodePool INSTANCE = new NodePool();
 
-    private final Map<Long, BaseNode> POOL = new ConcurrentHashMap<Long, BaseNode>();
-    private final LinkedBlockingQueue<Pair<Long, Long>> QUEUE = new LinkedBlockingQueue<Pair<Long, Long>>();
+    private final Map<Long, RootNode> POOL = new ConcurrentHashMap<Long, RootNode>();
+    private final LinkedBlockingQueue<RootNode> QUEUE = new LinkedBlockingQueue< RootNode>();
 
     private volatile long size = 5;
     public static NodePool getPool() {
         return INSTANCE;
     }
 
-    public BaseNode getNode(Long seed){
+    public RootNode getNode(Long seed){
         return POOL.get(seed);
     }
 
     public void setSize(long size){
         this.size = size;
         while(MAX.get() - MIN.get() > size) {
-            Pair<Long, Long> expire = QUEUE.poll();
-            if( expire != null){
-                POOL.remove(expire.getKey());
+            RootNode root = QUEUE.poll();
+            if( root != null){
+                POOL.remove(root.getId());
                 MIN.incrementAndGet();
             }else{
                 break;
@@ -45,29 +45,32 @@ public class NodePool {
     }
     public long getSize(){return size;}
 
-    public Map<Long, Long> getNodes(){
-        Map<Long, Long> map = new HashMap<Long, Long>();
-        Iterator<Pair<Long, Long>> itr = QUEUE.iterator();
+    public Map<Long, RootNode> getNodes(){
+        Map<Long, RootNode> map = new HashMap<Long, RootNode>();
+        Iterator<RootNode> itr = QUEUE.iterator();
         while(itr.hasNext()){
-            Pair<Long, Long> pair = itr.next();
-            map.put(pair.getKey(), pair.getValue());
+            RootNode root = itr.next();
+            map.put(root.getId(), root);
         }
         return map;
     }
 
-    public void addNode(BaseNode node){
+    public void addNode(BaseNode node, String type){
         long seed = MAX.incrementAndGet();
         while(seed - MIN.get() > size) {
-            Pair<Long, Long> expire = QUEUE.poll();
-            if( expire != null){
-                POOL.remove(expire.getKey());
+            RootNode root = QUEUE.poll();
+            if( root != null){
+                POOL.remove(root.getId());
                 MIN.incrementAndGet();
             }else{
                 break;
             }
         }
-        POOL.put(seed, node);
-        QUEUE.offer(new Pair<Long, Long>(seed, node.getId()));
+        RootNode root = new RootNode(seed, node, type);
+        POOL.put(seed, root);
+        QUEUE.offer(root);
     }
+
+
 
 }

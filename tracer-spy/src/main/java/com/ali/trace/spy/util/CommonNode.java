@@ -87,6 +87,8 @@ public class CommonNode extends BaseNode<CommonNode> {
             }
         }).create().toJson(node));
 
+        System.out.println(node.build(new StringBuilder()));
+
     }
 
 }

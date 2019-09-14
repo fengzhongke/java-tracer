@@ -45,12 +45,12 @@
                         </span>
                     </div>
                     <span class="btn btn-default input-group-addon sequence-op" name="filter-classes" data-toggle="modal" data-target="#packageModel">
-                        <span data-toggle="tooltip" data-placement="bottom" title="filter classes">
+                        <span data-toggle="tooltip" data-placement="bottom" title="filter packages">
                             <i class=" glyphicon glyphicon-filter"></i>
                         </span>
                     </span>
                     <span class="btn btn-default input-group-addon sequence-op" name="filter-classes" data-toggle="modal" data-target="#classModel">
-                        <span data-toggle="tooltip" data-placement="bottom" title="class list">
+                        <span data-toggle="tooltip" data-placement="bottom" title="filter classes">
                             <i class=" glyphicon glyphicon-list"></i>
                         </span>
                     </span>

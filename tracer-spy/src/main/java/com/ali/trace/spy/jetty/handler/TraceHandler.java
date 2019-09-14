@@ -12,11 +12,14 @@ import com.ali.trace.spy.jetty.vo.SetVO;
 import com.ali.trace.spy.jetty.vo.TraceVO;
 import com.ali.trace.spy.util.BaseNode;
 import com.ali.trace.spy.util.CompressNode;
+import com.ali.trace.spy.util.RootNode;
 import org.apache.commons.lang.math.NumberUtils;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 
@@ -39,10 +42,10 @@ public class TraceHandler implements ITraceHttpHandler {
                 nodePool.setSize(Integer.valueOf(sizeStr));
             }
             if (cname != null && mname != null) {
-                if(type.equalsIgnoreCase("common")){
-                    intercepter = new CommonTreeIntercepter(cname, mname);
-                }else {
+                if("CompressTreeIntercepter".equalsIgnoreCase(type)){
                     intercepter = new CompressTreeIntercepter(cname, mname);
+                }else {
+                    intercepter = new CommonTreeIntercepter(cname, mname);
                 }
                 ConfigPool.getPool().setIntercepter(intercepter);
             }else{
@@ -51,6 +54,7 @@ public class TraceHandler implements ITraceHttpHandler {
             }
             ret = new DataRet<String>(true, 0, "set class[" + cname + "]method[" + mname + "]size[" + sizeStr + "]");
         } catch (Exception e) {
+            e.printStackTrace();
             ret = new DataRet<String>(false, -1, "set class[" + cname + "]method[" + mname + "]failed" + e.getMessage());
         }
         return ret;
@@ -62,14 +66,16 @@ public class TraceHandler implements ITraceHttpHandler {
         try {
             String cname = null;
             String mname = null;
+            String type = null;
             if (intercepter != null) {
                 cname = intercepter.getC();
                 mname = intercepter.getM();
+                type = intercepter.getClass().getSimpleName();
             }
             long size = nodePool.getSize();
             MetaVO metaVO = new MetaVO(cname, mname);
             ret = new DataRet<SetVO>(true, 0, "get ok");
-            ret.setData(new SetVO(metaVO, size));
+            ret.setData(new SetVO(metaVO, type, size));
         } catch (Exception e) {
             ret = new DataRet(false, -1, "getSet failed" + e.getMessage());
         }
@@ -81,11 +87,17 @@ public class TraceHandler implements ITraceHttpHandler {
         DataRet<List<RecordVO>> ret = null;
         try {
             List<RecordVO> list = new ArrayList<RecordVO>();
-            Map<Long, Long> nodes = nodePool.getNodes();
-            for (Map.Entry<Long, Long> entry : nodes.entrySet()) {
+            Map<Long, RootNode> nodes = nodePool.getNodes();
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.S");
+            Calendar cal = Calendar.getInstance();
+            for (Map.Entry<Long, RootNode> entry : nodes.entrySet()) {
                 long seed = entry.getKey();
-                String[] names = CompressNode.getName(entry.getValue());
-                list.add(new RecordVO(seed, new MetaVO(names[0], names[1])));
+                RootNode root = entry.getValue();
+                String[] names = BaseNode.getName(root.getNode().getId());
+                cal.setTimeInMillis(root.getStart());
+                String time = sdf.format(cal.getTime());
+                long rt = root.getNode().getT();
+                list.add(new RecordVO(seed, root.getType(), new MetaVO(names[0], names[1]), time, rt));
             }
             ret = new DataRet<List<RecordVO>>(true, 0, "get ok");
             ret.setData(list);
@@ -100,10 +112,10 @@ public class TraceHandler implements ITraceHttpHandler {
         DataRet<TraceVO> ret = null;
         try {
             Long seed = Long.valueOf(id);
-            BaseNode node = nodePool.getNode(seed);
-            Map<Long, String[]> metas = node.getMetas();
+            RootNode node = nodePool.getNode(seed);
+            Map<Long, String[]> metas = node.getNode().getMetas();
             ret = new DataRet<TraceVO>(true, 0, "getjson id:[" + id + "]success");
-            ret.setData(new TraceVO(node, metas));
+            ret.setData(new TraceVO(node.getType(), node.getNode(), metas));
         } catch (Exception e) {
             ret = new DataRet(false, -1, "getjson id:[" + id + "]failed" + e.getMessage());
         }
@@ -114,10 +126,10 @@ public class TraceHandler implements ITraceHttpHandler {
     public void get(@TraceParam("id") String id, PrintWriter writer) throws IOException, InterruptedException {
         Long seed = Long.valueOf(id);
         if (intercepter != null) {
-            BaseNode node = nodePool.getNode(seed);
+            RootNode node = nodePool.getNode(seed);
             if (node != null) {
                 writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
-                node.writeFile(writer);
+                node.getNode().writeFile(writer);
             } else {
                 writer.write("no result no record");
             }

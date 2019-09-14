@@ -37,7 +37,12 @@ public class CompressNode extends BaseNode<CompressNode> {
     public Collection<CompressNode> getSons() {
         return new ArrayList<CompressNode>(s.values());
     }
-
+    @Override
+    protected StringBuilder buildInner(StringBuilder builder) {
+        builder.append(",'c':");
+        builder.append(c);
+        return builder;
+    }
     public void writeFile(Writer writer, int depth) throws IOException {
         if (depth > 0) {
             String[] items = getName(i);

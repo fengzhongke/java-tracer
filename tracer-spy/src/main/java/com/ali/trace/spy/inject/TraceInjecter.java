@@ -47,7 +47,7 @@ public class TraceInjecter {
                     && !name.startsWith("com/alibaba/jvm/sandbox/core/manager/impl/SandboxClassFileTransformer")
                 && !name.startsWith("com/google/gson/internal/reflect/ReflectionAccessor"))
                     || (loader == null && name.startsWith("java/com/alibaba/jvm/sandbox/spy"))) {
-                    bytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name)).getBytes();
+                    bytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name), false).getBytes();
                     type = 1;
                 }
             }
@@ -56,9 +56,16 @@ public class TraceInjecter {
             type = 3;
             throw e;
         } catch (Throwable t) {
-            type = 2;
-            t.printStackTrace();
-            throw t;
+            try{
+                bytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name), true).getBytes();
+                type = 1;
+                return bytes;
+            }catch (Throwable t1){
+                type = 2;
+                System.err.println("class : " + name);
+                t.printStackTrace();
+                throw t;
+            }
         } finally {
             if (name != null) {
                 POOL.addClass(loader, name, type);
@@ -69,9 +76,13 @@ public class TraceInjecter {
     class CodeReader extends ClassReader {
         private final ClassWriter classWriter;
 
-        public CodeReader(final ClassLoader loader, final String name, byte[] bytes, final boolean redefine) {
+        public CodeReader(final ClassLoader loader, final String name, byte[] bytes, final boolean redefine, boolean common) {
             super(bytes);
-            classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            int flag = ClassWriter.COMPUTE_MAXS;
+            if(!common){
+                flag = flag | ClassWriter.COMPUTE_FRAMES;
+            }
+            classWriter = new ClassWriter(flag) {
                 @Override
                 public ClassLoader getClassLoader() {
                     return loader;
@@ -92,7 +103,7 @@ public class TraceInjecter {
                     return super.getCommonSuperClass(type1, type2);
                 }
             };
-            accept(new CodeVisitor(classWriter), EXPAND_FRAMES);
+            accept(new CodeVisitor(classWriter, common), EXPAND_FRAMES);
         }
         /**
          * return modified bytes
@@ -110,9 +121,11 @@ public class TraceInjecter {
      */
     class CodeVisitor extends ClassVisitor {
         private String cName;
+        private boolean common;
 
-        public CodeVisitor(ClassVisitor cv) {
+        public CodeVisitor(ClassVisitor cv, boolean common) {
             super(Opcodes.ASM7, cv);
+            this.common = common;
         }
 
         @Override
@@ -127,7 +140,11 @@ public class TraceInjecter {
             if ((access & 256) != 0) {
                 return super.visitMethod(access, name, desc, signature, exceptions);
             }
-            return new FinallyAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name, desc);
+            if(common){
+                return new CommonAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name, desc);
+            }else {
+                return new FinallyAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name, desc);
+            }
         }
 
         class FinallyAdapter extends AdviceAdapter {
@@ -137,7 +154,7 @@ public class TraceInjecter {
 
             public FinallyAdapter(MethodVisitor methodVisitor, int acc, String name, String desc) {
                 super(Opcodes.ASM7, methodVisitor, acc, name, desc);
-                this.mName = name.replaceAll("<|>|\\$", "");
+                this.mName = name.replaceAll("<", "_").replaceAll("\\$|>", "");
             }
 
             @Override
@@ -166,6 +183,33 @@ public class TraceInjecter {
             }
 
             private void onFinally() {
+                push(cName);
+                push(mName);
+                invokeStatic(TYPE, END);
+            }
+        }
+
+
+
+        class CommonAdapter extends AdviceAdapter {
+            private String mName;
+            private Label startFinally = new Label();
+            private Label endFinally = new Label();
+
+            public CommonAdapter(MethodVisitor methodVisitor, int acc, String name, String desc) {
+                super(Opcodes.ASM7, methodVisitor, acc, name, desc);
+                this.mName = name.replaceAll("<", "_").replaceAll("\\$|>", "");
+            }
+
+            @Override
+            protected void onMethodEnter() {
+                push(cName);
+                push(mName);
+                invokeStatic(TYPE, START);
+            }
+
+            @Override
+            protected void onMethodExit(int opcode) {
                 push(cName);
                 push(mName);
                 invokeStatic(TYPE, END);

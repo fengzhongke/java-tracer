@@ -64,6 +64,10 @@ public abstract class BaseNode<T extends BaseNode<T>> {
         return i;
     }
 
+    public long getT() {
+        return t;
+    }
+
     public void addRt(long rt) {
         this.t += rt;
     }
@@ -94,5 +98,31 @@ public abstract class BaseNode<T extends BaseNode<T>> {
     public abstract BaseNode<T> addSon(long id) ;
 
     public abstract Collection<T> getSons();
+
+    protected StringBuilder buildInner(StringBuilder builder) {
+        return builder;
+    }
+
+    public final StringBuilder build(StringBuilder builder) {
+        //{"s":[{"i":763,"t":0}],"i":763,"t":0}
+        builder.append("{'i':");
+        builder.append(i);
+        builder.append(",'t':");
+        builder.append(t);
+        buildInner(builder);
+        Collection<T> s = getSons();
+        if(!s.isEmpty()){
+            builder.append(",'s':[");
+            String split = "";
+            for(T node : s){
+                builder.append(split);
+                node.build(builder);
+                split = ",";
+            }
+            builder.append("]");
+        }
+        builder.append("}");
+        return builder;
+    }
 
 }
