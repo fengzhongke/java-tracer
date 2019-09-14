@@ -327,7 +327,7 @@ var init = function(id){
     });
 }
 
-var static_init() =function(ret){
+var static_init =function(ret){
     chart = new Chart(ret.data.type, ret.data.node, ret.data.metas)
 }
 

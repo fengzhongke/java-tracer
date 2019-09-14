@@ -63,8 +63,8 @@ public class TraceInjecter {
             }catch (Throwable t1){
                 type = 2;
                 System.err.println("class : " + name);
-                t.printStackTrace();
-                throw t;
+                t1.printStackTrace();
+                throw t1;
             }
         } finally {
             if (name != null) {
