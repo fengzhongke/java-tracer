@@ -42,8 +42,8 @@ actions include
 END
 
 ## DEMO:
-1、Mybatis ：https://fengzhongke.github.io/pages/chart.html?page=mybatis
-2、Spring ：https://fengzhongke.github.io/pages/chart.html?page=spring
-3、Netty1 ：https://fengzhongke.github.io/pages/chart.html?page=NettyServer
-4、Netty2 ：https://fengzhongke.github.io/pages/chart.html?page=NioEventLoop
+-1、Mybatis ：https://fengzhongke.github.io/pages/chart.html?page=mybatis
+-2、Spring ：https://fengzhongke.github.io/pages/chart.html?page=spring
+-3、Netty1 ：https://fengzhongke.github.io/pages/chart.html?page=NettyServer
+-4、Netty2 ：https://fengzhongke.github.io/pages/chart.html?page=NioEventLoop
 
