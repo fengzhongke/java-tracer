@@ -1,5 +1,8 @@
 package com.ali.trace.spy.inject;
 
+import com.ali.trace.spy.core.NodePool;
+import com.ali.trace.spy.intercepter.CommonThreadntercepter;
+import com.ali.trace.spy.intercepter.CompressThreadIntercepter;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -28,14 +31,19 @@ public class TraceInjecter {
     private final Method END;
     private final ConfigPool POOL = ConfigPool.getPool();
 
-    public TraceInjecter(Instrumentation inst, Class<?> clasz, int port) throws NoSuchMethodException, SecurityException {
-
+    public TraceInjecter(Instrumentation inst, Class<?> clasz, int port, int mode) throws NoSuchMethodException, SecurityException {
         LOADER = getClass().getClassLoader();
         TYPE = Type.getType(clasz);
         START = Method.getMethod(clasz.getMethod("s", new Class<?>[] {String.class, String.class}));
         END = Method.getMethod(clasz.getMethod("e", new Class<?>[] {String.class, String.class}));
         POOL.setInst(inst);
         POOL.setWeaveClass(clasz);
+        NodePool.getPool().setMode(mode);
+        if(mode == 1){
+            POOL.setIntercepter(new CommonThreadntercepter());
+        }else if(mode == 2){
+            POOL.setIntercepter(new CompressThreadIntercepter());
+        }
         new JettyServer(port);
     }
 
@@ -63,7 +71,7 @@ public class TraceInjecter {
             }catch (Throwable t1){
                 type = 2;
                 System.err.println("class : " + name);
-                t1.printStackTrace();
+                //t1.printStackTrace();
                 throw t1;
             }
         } finally {
@@ -188,8 +196,6 @@ public class TraceInjecter {
                 invokeStatic(TYPE, END);
             }
         }
-
-
 
         class CommonAdapter extends AdviceAdapter {
             private String mName;

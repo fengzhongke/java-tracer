@@ -30,6 +30,7 @@ public class Premain {
 
     private static final String CONFIG_PORT="port";
     private static final String CONFIG_SLEEP="sleep";
+    private static final String CONFIG_MODE="mode";
 
 
     private static final SpyClassLoader LOADER = new SpyClassLoader(null);
@@ -37,9 +38,9 @@ public class Premain {
 
     public static void premain(String args, Instrumentation inst) {
         Map<String, String> configs = new HashMap<String, String>();
-
         int port = DEFAULT_PORT;
         long sleep = 1L;
+        int mode = 0;
         if (args != null) {
             String[] pairs = args.split(":");
             if(pairs != null){
@@ -60,10 +61,14 @@ public class Premain {
             if(sleepStr != null){
                 sleep = Long.parseLong(sleepStr);
             }
+            String modeStr = configs.get(CONFIG_MODE);
+            if(modeStr != null){
+                mode = Integer.valueOf(modeStr);
+            }
         }
         System.out.println("init trace agent with port [" + port + "] and sleep [" + sleep + "]");
         System.out.println("pages can be found in http://127.0.0.1:" + port);
-        Object inject = loadSpyJar(inst, port);
+        Object inject = loadSpyJar(inst, port, mode);
         try {
             if (inject == null) {
                 throw new Exception("inject is null");
@@ -78,7 +83,7 @@ public class Premain {
     /**
      * agent loaded by bootstrap loader, spy and all dependent jars loaded by spy loader
      */
-    private static Object loadSpyJar(Instrumentation inst, int port) {
+    private static Object loadSpyJar(Instrumentation inst, int port, int mode) {
         Object inject = null;
         if ((inject = INJECT.get()) == null) {
             synchronized (Premain.class) {
@@ -118,7 +123,7 @@ public class Premain {
                         }
                         Class<?> injectClass = LOADER.loadClass(SPY_CLASS);
                         INJECT.set(inject =
-                            injectClass.getConstructor(Instrumentation.class, Class.class, int.class).newInstance(inst, TraceEnhance.class, port));
+                            injectClass.getConstructor(Instrumentation.class, Class.class, int.class, int.class).newInstance(inst, TraceEnhance.class, port, mode));
                     } catch (Throwable t) {
                         t.printStackTrace();
                     }

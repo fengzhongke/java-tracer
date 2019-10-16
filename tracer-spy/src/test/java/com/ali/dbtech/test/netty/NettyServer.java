@@ -32,9 +32,10 @@ public class NettyServer {
      **/
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup pGroup = new NioEventLoopGroup(1);
+        EventLoopGroup sGroup = new NioEventLoopGroup(1);
         try {
             ServerBootstrap b = new ServerBootstrap();
-            b.group(pGroup, pGroup);
+            b.group(pGroup, sGroup);
             b.channel(NioServerSocketChannel.class);
             b.childHandler(new NettyServerFilter()); //设置过滤器
             // 服务器绑定端口监听
@@ -44,7 +45,7 @@ public class NettyServer {
             f.channel().closeFuture().sync();
         } finally {
             pGroup.shutdownGracefully(); ////关闭EventLoopGroup，释放掉所有资源包括创建的线程
-            //sGroup.shutdownGracefully(); ////关闭EventLoopGroup，释放掉所有资源包括创建的线程
+            sGroup.shutdownGracefully(); ////关闭EventLoopGroup，释放掉所有资源包括创建的线程
         }
     }
 }

@@ -5,7 +5,7 @@ import com.ali.trace.spy.util.CommonNode;
 /**
  * @author nkhanlang@163.com
  */
-public class CommonTreeIntercepter extends BaseTreeIntercepter<CommonNode>{
+public class CommonTreeIntercepter extends MethodTreeIntercepter<CommonNode> {
 
     public CommonTreeIntercepter(String c, String m) {
         super(c, m);

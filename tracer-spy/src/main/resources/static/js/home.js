@@ -5,12 +5,16 @@ $('#refresh').click(function(){
         var ret = JSON.parse(str);
         if(ret.status){
             data = ret.data;
-            if(data.metaVO.hasOwnProperty('cname') && data.metaVO.hasOwnProperty('mname')){
-                $('label[name=cname]', $('#form_set')).html(data.metaVO.cname);
-                $('label[name=mname]', $('#form_set')).html(data.metaVO.mname);
-                $('label[name=type]', $('#form_set')).html(data.type);
+            if(data.mode > 0){
+                $('#form_set').hide();
+            }else {
+                if (data.metaVO.hasOwnProperty('cname') && data.metaVO.hasOwnProperty('mname')) {
+                    $('label[name=cname]', $('#form_set')).html(data.metaVO.cname);
+                    $('label[name=mname]', $('#form_set')).html(data.metaVO.mname);
+                    $('label[name=type]', $('#form_set')).html(data.type);
+                }
+                $('label[name=size]', $('#form_set')).html(data.size);
             }
-            $('label[name=size]', $('#form_set')).html(data.size);
         }
     });
     $.post("/trace/list", function(str){

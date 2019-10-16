@@ -22,6 +22,8 @@ public class NodePool {
     private final Map<Long, RootNode> POOL = new ConcurrentHashMap<Long, RootNode>();
     private final LinkedBlockingQueue<RootNode> QUEUE = new LinkedBlockingQueue< RootNode>();
 
+
+    private int mode;
     private volatile long size = 5;
     public static NodePool getPool() {
         return INSTANCE;
@@ -29,6 +31,17 @@ public class NodePool {
 
     public RootNode getNode(Long seed){
         return POOL.get(seed);
+    }
+
+
+    public void setMode(int mode){
+        this.mode = mode;
+        if(mode > 0){
+            setSize(1024L);
+        }
+    }
+    public int getMode(){
+        return mode;
     }
 
     public void setSize(long size){

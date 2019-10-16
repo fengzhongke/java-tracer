@@ -28,7 +28,6 @@ public class ConfigPool {
     private volatile String redefineName;
     private EmptyTransformer emptyTransformer = new EmptyTransformer();
 
-
     public static ConfigPool getPool() {
         return INSTANCE;
     }

@@ -2,7 +2,7 @@ package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.NodePool;
-import com.ali.trace.spy.intercepter.BaseTreeIntercepter;
+import com.ali.trace.spy.intercepter.MethodTreeIntercepter;
 import com.ali.trace.spy.intercepter.CommonTreeIntercepter;
 import com.ali.trace.spy.intercepter.CompressTreeIntercepter;
 import com.ali.trace.spy.jetty.vo.DataRet;
@@ -11,7 +11,6 @@ import com.ali.trace.spy.jetty.vo.RecordVO;
 import com.ali.trace.spy.jetty.vo.SetVO;
 import com.ali.trace.spy.jetty.vo.TraceVO;
 import com.ali.trace.spy.util.BaseNode;
-import com.ali.trace.spy.util.CompressNode;
 import com.ali.trace.spy.util.RootNode;
 import org.apache.commons.lang.math.NumberUtils;
 
@@ -28,7 +27,7 @@ import java.util.Map;
  */
 public class TraceHandler implements ITraceHttpHandler {
 
-    private volatile BaseTreeIntercepter intercepter;
+    private volatile MethodTreeIntercepter intercepter;
     private final NodePool nodePool = NodePool.getPool();
 
     @TracerPath(value = "/trace/set", order = 1)
@@ -73,9 +72,10 @@ public class TraceHandler implements ITraceHttpHandler {
                 type = intercepter.getClass().getSimpleName();
             }
             long size = nodePool.getSize();
+            int mode = nodePool.getMode();
             MetaVO metaVO = new MetaVO(cname, mname);
             ret = new DataRet<SetVO>(true, 0, "get ok");
-            ret.setData(new SetVO(metaVO, type, size));
+            ret.setData(new SetVO(metaVO, type, size, mode));
         } catch (Exception e) {
             ret = new DataRet(false, -1, "getSet failed" + e.getMessage());
         }

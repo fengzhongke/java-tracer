@@ -8,11 +8,13 @@ public class SetVO {
     private MetaVO metaVO;
     private String type;
     private long size;
+    private int mode;
 
-    public SetVO(MetaVO metaVO, String type, long size){
+    public SetVO(MetaVO metaVO, String type, long size, int mode){
         this.metaVO = metaVO;
         this.type = type;
         this.size = size;
+        this.mode = mode;
     }
     public MetaVO getMetaVO() {
         return metaVO;
@@ -36,5 +38,13 @@ public class SetVO {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public int getMode() {
+        return mode;
+    }
+
+    public void setMode(int mode) {
+        this.mode = mode;
     }
 }

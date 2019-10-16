@@ -199,13 +199,12 @@ function DynSeq(parent, node, meta){
         return this.getLines(this.filter(this.getWithout(), depth, $.extend(true, {}, this.node)), "", depth, 0);
     };
     this.getLines = function(n, path, depth, count, invoke){
-        if(depth > 0 && n.hasOwnProperty('s') && n.s.length > 0){
+        if(depth > 0 && n.hasOwnProperty('s')){
             var lines = [];
             var src = this.meta.metas[n.i];
             if(count == 0){
                 this.set = {};
                 var cnt = (n.c && n.c > 1) ? ":cnt:" + n.c : "";
-                var cnt = n.c > 1 ? ":cnt:" + n.c : "";
                 var rt = n.t > 1 ? ":rt:" + n.t : "";
                 lines.push("Title:" + src[0] + "." + src[1] + "\\n" + cnt + rt + " [fillcolor='#fef']");
             }
@@ -235,7 +234,7 @@ function DynSeq(parent, node, meta){
                     lines.push(srcName + "->" + dstName + ":" + nextInvoke + "." + dst[1] + cnt + " [" + id + "," + pa + ", fontcolor='#0af', type='in']");
                     lines = lines.concat(subLines);
                     lines.push(dstName + "-->" + srcName + ":" + nextInvoke + "."  + dst[1]  + rt + " [fontcolor='#0af', type='out']");
-                }else if(son.hasOwnProperty('s') && son.s.length > 0){
+                }else if(son.hasOwnProperty('s')){
                     lines.push(srcName + "->" + dstName + ":" + nextInvoke + "." + dst[1] + cnt + rt + " [" + id + "," + pa + ",fontcolor='#a0f', type='in']");
                 }else{
                     lines.push(srcName + "->" + dstName + ":" + nextInvoke + "." + dst[1] + cnt + rt + " [" + id + "," + pa + ", type='all']");
@@ -325,10 +324,6 @@ var init = function(id){
             chart = new Chart(ret.data.type, ret.data.node, ret.data.metas)
         }
     });
-}
-
-var static_init =function(ret){
-    chart = new Chart(ret.data.type, ret.data.node, ret.data.metas)
 }
 
 $("[data-toggle='tooltip']").tooltip();
