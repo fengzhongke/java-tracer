@@ -8,9 +8,9 @@ import java.lang.reflect.Method;
 public class TraceEnhance {
 
     /**
-     * inner intercepter
+     * inner interceptor
      */
-    private static volatile Intercepter intercepter;
+    private static volatile interceptor interceptor;
 
     /**
      * to avoid 
@@ -18,13 +18,15 @@ public class TraceEnhance {
     private static final ThreadLocal<Boolean> IN = new ThreadLocal<Boolean>();
 
     /**
-     * set intercepter
+     * set interceptor
      */
-    public static boolean setIntecepter(Object instance) {
+    public static boolean setInterceptor(Object instance) {
         boolean set = false;
         if (instance != null) {
             try {
-                TraceEnhance.intercepter = new Intercepter(instance);
+                TraceEnhance.interceptor = new interceptor(instance);
+                System.out.println("set interceptor[" + instance.getClass() + "]");
+
                 set = true;
             } catch (Throwable e) {
                 e.printStackTrace();
@@ -33,8 +35,13 @@ public class TraceEnhance {
         return set;
     }
 
-    public static void delIntercepter() {
-        intercepter = null;
+    public static void delInterceptor() {
+        System.out.println("delete interceptor");
+        interceptor = null;
+    }
+    
+    public static interceptor getInterceptor() {
+        return interceptor;
     }
 
     /**
@@ -42,9 +49,9 @@ public class TraceEnhance {
      */
     public static final void s(String c, String m) {
         try {
-            if (intercepter != null && IN.get() == null) {
+            if (interceptor != null && IN.get() == null) {
                 IN.set(true);
-                intercepter.START.invoke(intercepter.INSTANCE, c, m);
+                interceptor.START.invoke(interceptor.INSTANCE, c, m);
                 IN.set(null);
             }
         } catch (Throwable t) {
@@ -57,9 +64,9 @@ public class TraceEnhance {
      */
     public static final void e(String c, String m) {
         try {
-            if (intercepter != null && IN.get() == null) {
+            if (interceptor != null && IN.get() == null) {
                 IN.set(true);
-                intercepter.END.invoke(intercepter.INSTANCE, c, m);
+                interceptor.END.invoke(interceptor.INSTANCE, c, m);
                 IN.set(null);
             }
         } catch (Throwable t) {
@@ -67,12 +74,12 @@ public class TraceEnhance {
         }
     }
 
-    private static class Intercepter {
+    private static class interceptor {
         final Object INSTANCE;
         final Method START;
         final Method END;
 
-        Intercepter(Object instance) throws Exception {
+        interceptor(Object instance) throws Exception {
             INSTANCE = instance;
             Class<?> clazz = instance.getClass();
             START = clazz.getMethod("start", String.class, String.class);

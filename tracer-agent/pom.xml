@@ -17,6 +17,14 @@
 			<groupId>java-tracer</groupId>
 			<artifactId>tracer-spy</artifactId>
 		</dependency>
+
+		<dependency>
+			<groupId>com.test</groupId>
+			<artifactId>tools.jar</artifactId>
+			<version>1.0</version>
+			<scope>system</scope>
+			<systemPath>D:/tool/java8/lib/tools.jar</systemPath>
+		</dependency>
 	</dependencies>
 
 	<build>

@@ -1,4 +1,4 @@
-package com.ali.trace.spy.intercepter;
+package com.ali.trace.spy.interceptor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,14 +17,14 @@ import com.ali.trace.spy.util.NameUtils;
  * @author nkhanlang@163.com
  *
  */
-public class CompressIntercepter extends BaseIntercepter {
+public class CompressInterceptor extends BaseInterceptor {
 	private final ThreadLocal<Integer> t_depth = new ThreadLocal<Integer>();
 	private final ThreadLocal<Integer> t_seq = new ThreadLocal<Integer>();
 	private final ThreadLocal<Map<String, Node>> t_map = new ThreadLocal<Map<String, Node>>();
 	private final ThreadLocal<Node> t_root = new ThreadLocal<Node>();
 	private final ThreadLocal<Stack<Node>> t_stack = new ThreadLocal<Stack<Node>>();
 
-	public CompressIntercepter(String path) {
+	public CompressInterceptor(String path) {
 		super(path);
 	}
 

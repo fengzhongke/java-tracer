@@ -42,4 +42,17 @@ public class RecordVO {
     public void setType(String type) {
         this.type = type;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"type\":\"").append(type).append("\"");
+        sb.append(",\"seed\":").append(seed);
+        sb.append(",\"time\":\"").append(time).append("\"");
+        sb.append(",\"rt\":").append(rt);
+        sb.append(",\"metaVO\":").append(metaVO);
+        sb.append("}");
+        return sb.toString();
+    }
 }

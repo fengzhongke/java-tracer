@@ -1,7 +1,7 @@
 
 var data = null;
-$('#refresh').click(function(){
-    $.post("/trace/getSet", function(str){
+$('#index_refresh').click(function(){
+    $.post("/index/get", function(str){
         var ret = JSON.parse(str);
         if(ret.status){
             data = ret.data;
@@ -17,7 +17,7 @@ $('#refresh').click(function(){
             }
         }
     });
-    $.post("/trace/list", function(str){
+    $.post("/index/list", function(str){
         var ret = JSON.parse(str);
         if(ret.status){
             $('.list-show-item', $('#form_list')).remove();
@@ -37,8 +37,7 @@ $('#refresh').click(function(){
         }
     });
 });
-$('#refresh').click();
-$('#set').click(function(){
+$('#index_set').click(function(){
     if(data){
         $('input[name=model_cname]').val(data.metaVO.cname);
         $('input[name=model_mname]').val(data.metaVO.mname);
@@ -47,13 +46,13 @@ $('#set').click(function(){
     }
 });
 
-$('#confirm').click(function(){
+$('#index_confirm').click(function(){
     var cname = $('input[name=model_cname]').val();
     var mname = $('input[name=model_mname]').val();
     var type = $('input[name=model_type]').val();
     var size = $('input[name=model_size]').val();
     if(confirm("set class:[" + cname + "]method:[" + mname + "] type:[" + type + "] size:[" + size + "] ? ")){
-        $.post("/trace/set", {class:cname, method:mname, type:type, size:size}, function(str){
+        $.post("/index/set", {class:cname, method:mname, type:type, size:size}, function(str){
             var ret = JSON.parse(str);
             if(ret.status){
                 alert("set sucess!");
@@ -64,4 +63,47 @@ $('#confirm').click(function(){
         });
     }
 });
+
+
+
+$('#class_refresh').click(function(){
+    $.post("/class/get", function(str){
+        var ret = JSON.parse(str);
+        if(ret.status){
+            data = ret.data;
+            if(data.mode > 0){
+                $('#form_set').hide();
+            }else {
+                if (data.hasOwnProperty('include') && data.hasOwnProperty('exclude')) {
+                    $('label[name=include]', $('#form_set')).html(data.include);
+                    $('label[name=exclude]', $('#form_set')).html(data.exclude);
+                }
+            }
+        }
+    });
+});
+
+$('#class_set').click(function(){
+    if(data){
+        $('input[name=model_include]').val(data.include);
+        $('input[name=model_exclude]').val(data.exclude);
+    }
+});
+$('#class_confirm').click(function(){
+    var include = $('input[name=model_include]').val();
+    var exclude = $('input[name=model_exclude]').val();
+    if(confirm("set include:[" + include + "]exclude:[" + exclude + "] and refresh ? ")){
+        $.post("/class/set", {include:include, exclude:exclude}, function(str){
+            var ret = JSON.parse(str);
+            if(ret.status){
+                alert("set sucess!");
+                location.reload();
+            }else{
+                alert("set failed :[" + ret.msg + "]");
+            }
+        });
+    }
+});
+
+$('button[name=auto_refresh]').click();
 

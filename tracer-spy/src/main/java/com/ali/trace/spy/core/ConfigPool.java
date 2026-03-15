@@ -1,6 +1,9 @@
 package com.ali.trace.spy.core;
 
-import com.ali.trace.spy.intercepter.IIntercepter;
+import com.ali.trace.spy.inject.TraceInjector;
+import com.ali.trace.spy.interceptor.IInterceptor;
+
+import org.apache.commons.lang.StringUtils;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -8,8 +11,11 @@ import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +30,7 @@ public class ConfigPool {
     private CopyOnWriteArrayList<LoaderSet> loaderSets = new CopyOnWriteArrayList<LoaderSet>();
     private Class<?> weaveClass;
     private Instrumentation inst;
+    private TraceInjector injector;
     private volatile ClassLoader redefineLoader;
     private volatile String redefineName;
     private EmptyTransformer emptyTransformer = new EmptyTransformer();
@@ -32,12 +39,56 @@ public class ConfigPool {
         return INSTANCE;
     }
 
-    public void setInst(Instrumentation inst) {
+    public void setInst(Instrumentation inst, TraceInjector injector) {
         this.inst = inst;
+        this.injector = injector;
     }
 
     public boolean isRedefine(ClassLoader loader, String name){
         return loader == redefineLoader && name.equalsIgnoreCase(redefineName);
+    }
+
+    public void resetConfig(String includes, String excludes) {
+        List<String> configLines = new ArrayList<>();
+        configLines.add("include:");
+        Collections.addAll(configLines, includes.split(";"));
+        configLines.add("exclude:");
+        Collections.addAll(configLines, excludes.split(";"));
+        injector.setConfig(configLines);
+        for(LoaderSet loaderSet : loaderSets){
+            for (Map.Entry<String, Integer> entry : loaderSet.classNames.entrySet()) {
+                String name = entry.getKey();
+                boolean filter = injector.filter(name);
+                if (!filter && entry.getValue() == 0) {
+                    redefine(loaderSet.getLoader(), name);
+                } else if (filter && entry.getValue() > 0) {
+                    redefine(loaderSet.getLoader(), name);
+                }
+            }
+        }
+    }
+
+    public List<String> getConfig() {
+        Set<String> includes = new HashSet<>();
+        Set<String> excludes = new HashSet<>();
+        Set<String> parts = null;
+        for (String line : injector.getConfig()) {
+            if (line.contains("include:")) {
+                parts = includes;
+            } else if (line.contains("exclude:")) {
+                parts = excludes;
+            } else if (parts != null && StringUtils.isNotBlank(line.trim())) {
+                parts.add(line.trim());
+            }
+        }
+        List<String> lines = new ArrayList<>();
+        lines.add(StringUtils.join(includes.toArray(), ";"));
+        lines.add(StringUtils.join(excludes.toArray(), ";"));
+        return lines;
+    }
+
+    public List<String> getRedefinedNames() {
+        return injector.getRedefinedNames();
     }
 
     public void redefine(int type){
@@ -56,7 +107,8 @@ public class ConfigPool {
         this.redefineName = name;
         try {
             inst.retransformClasses(loader.loadClass(name.replace("/", ".")));
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            System.out.println("redefine error [" + name + "]");
             e.printStackTrace();
         }
         this.redefineLoader = null;
@@ -64,7 +116,7 @@ public class ConfigPool {
     }
 
     public ClassLoader redefine(int loaderId, String redefineName){
-        LoaderSet loaderSet = getLoderSet(Integer.valueOf(loaderId));
+        LoaderSet loaderSet = getLoaderSet(Integer.valueOf(loaderId));
         ClassLoader loader =null;
         if(loaderSet != null) {
             loader = loaderSet.getLoader();
@@ -104,7 +156,7 @@ public class ConfigPool {
         return new ArrayList<LoaderSet>(loaderSets);
     }
 
-    private LoaderSet getLoderSet(int id){
+    private LoaderSet getLoaderSet(int id){
         LoaderSet loaderSet = null;;
         for (LoaderSet set : loaderSets) {
             if (set.id == id) {
@@ -120,12 +172,12 @@ public class ConfigPool {
         }
     }
 
-    public boolean setIntercepter(IIntercepter intercepter) {
+    public boolean setinterceptor(IInterceptor interceptor) {
         boolean set = false;
         if (weaveClass != null) {
             try {
-                Method method = weaveClass.getDeclaredMethod("setIntecepter", Object.class);
-                Object setObj = method.invoke(null, intercepter);
+                Method method = weaveClass.getDeclaredMethod("setInterceptor", Object.class);
+                Object setObj = method.invoke(null, interceptor);
                 if (setObj != null && Boolean.TRUE.equals(setObj)) {
                     set = true;
                 }
@@ -136,11 +188,11 @@ public class ConfigPool {
         return set;
     }
 
-    public boolean delIntercepter() {
+    public boolean delInterceptor() {
         boolean del = false;
         if (weaveClass != null) {
             try {
-                Method method = weaveClass.getDeclaredMethod("delIntercepter");
+                Method method = weaveClass.getDeclaredMethod("delInterceptor");
                 method.invoke(null);
                 del = true;
             } catch (Throwable e) {
@@ -148,6 +200,19 @@ public class ConfigPool {
             }
         }
         return del;
+    }
+
+    public IInterceptor getInterceptor() {
+        IInterceptor interceptor = null;
+        if (weaveClass != null) {
+            try {
+                Method method = weaveClass.getDeclaredMethod("getInterceptor");
+                interceptor = (IInterceptor) method.invoke(null);
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+        }
+        return interceptor;
     }
 
     public class LoaderSet {

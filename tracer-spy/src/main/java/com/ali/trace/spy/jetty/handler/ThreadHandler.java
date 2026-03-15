@@ -18,7 +18,7 @@ import java.util.Map.Entry;
  */
 public class ThreadHandler implements ITraceHttpHandler {
 
-    @TracerPath(value = "/thread", order = 10)
+    @TracerPath(value = "/thread/get.xml", order = 10)
     public void thread(PrintWriter writer) throws IOException {
         Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");

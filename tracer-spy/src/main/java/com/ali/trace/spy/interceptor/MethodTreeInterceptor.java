@@ -1,4 +1,4 @@
-package com.ali.trace.spy.intercepter;
+package com.ali.trace.spy.interceptor;
 
 import com.ali.trace.spy.core.NodePool;
 import com.ali.trace.spy.util.BaseNode;
@@ -8,28 +8,40 @@ import java.util.Stack;
 /**
  * @author nkhanlang@163.com
  */
-public abstract class ThreadTreeIntercepter<T extends BaseNode> extends BaseIntercepter {
+public abstract class MethodTreeInterceptor<T extends BaseNode> extends BaseInterceptor {
 
+	protected final String c;
+	protected final String m;
 	protected final ThreadLocal<Stack<T>> t_stack = new ThreadLocal<Stack<T>>();
 	protected final ThreadLocal<Stack<Long>> t_time = new ThreadLocal<Stack<Long>>();
 	protected final NodePool nodePool;
 
-	public ThreadTreeIntercepter() {
+	public MethodTreeInterceptor(String c, String m) {
 		super(null);
+		this.c = c;
+		this.m = m;
 		nodePool = NodePool.getPool();
+		System.out.println("new interceptor[" + this.c + "(" + this.m + ")" + "]");
+	}
+
+	public String getC(){
+		return c;
+	}
+	public String getM(){
+		return m;
 	}
 
 	public void start(String c, String m) {
 		Stack<T> stack = t_stack.get();
 		Stack<Long> time = t_time.get();
-		if (stack == null) {
-			t_stack.set(stack = new Stack<T>());
-			T node = getNode(BaseNode.getId(c, m));
-			Thread t = Thread.currentThread();
-			nodePool.addNode(node, t.getName() + "[" + t.getId() + "]");
-			stack.add(node);
-			t_time.set(time = new Stack<Long>());
-			time.add(System.currentTimeMillis());
+		if (c.equalsIgnoreCase(this.c) && m.equalsIgnoreCase(this.m)) {
+			if (stack == null && !nodePool.isFull()) {
+				t_stack.set(stack = new Stack<T>());
+				T node = getNode(BaseNode.getId(c, m));
+				nodePool.addNode(node, getClass().getSimpleName());
+				stack.add(node);
+				t_time.set(time = new Stack<Long>());
+			}
 		}
 		if (stack != null && !stack.isEmpty()) {
 			if (!time.isEmpty()) {

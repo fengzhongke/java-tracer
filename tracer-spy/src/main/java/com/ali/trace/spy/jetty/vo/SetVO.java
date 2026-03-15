@@ -47,4 +47,16 @@ public class SetVO {
     public void setMode(int mode) {
         this.mode = mode;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"type\":\"").append(type).append("\"");
+        sb.append(",\"size\":").append(size);
+        sb.append(",\"mode\":").append(mode);
+        sb.append(",\"metaVO\":").append(metaVO);
+        sb.append("}");
+        return sb.toString();
+    }
 }

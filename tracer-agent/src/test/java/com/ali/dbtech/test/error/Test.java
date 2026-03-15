@@ -16,5 +16,6 @@ package com.ali.dbtech.test.error;
 public class Test {
     public Test() {
         System.out.println(this != null ? this : new Object());
+        com.sun.tools.attach.VirtualMachine V;
     }
 }

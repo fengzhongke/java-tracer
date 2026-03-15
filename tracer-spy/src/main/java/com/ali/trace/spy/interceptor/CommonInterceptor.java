@@ -1,4 +1,4 @@
-package com.ali.trace.spy.intercepter;
+package com.ali.trace.spy.interceptor;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -10,7 +10,7 @@ import java.util.Stack;
 /**
  * @author nkhanlang@163.com
  */
-public class CommonIntercepter extends BaseIntercepter {
+public class CommonInterceptor extends BaseInterceptor {
 
 	private final long start = System.currentTimeMillis();
 	private final ThreadLocal<Piece> prePiece = new ThreadLocal<Piece>();
@@ -27,7 +27,7 @@ public class CommonIntercepter extends BaseIntercepter {
 	private static final char SON_COUNT = 's';
 	private static Map<Character, String> INFO_MAP = new HashMap<Character, String>();
 	static {
-		Field[] fields = CommonIntercepter.class.getDeclaredFields();
+		Field[] fields = CommonInterceptor.class.getDeclaredFields();
 		for (Field field : fields) {
 			if (field.getType() == char.class) {
 				try {
@@ -40,7 +40,7 @@ public class CommonIntercepter extends BaseIntercepter {
 	}
 
 	private final boolean printTime;
-	public CommonIntercepter(String path, boolean printTime) {
+	public CommonInterceptor(String path, boolean printTime) {
 		super(path);
 		this.printTime = printTime;
 	}

@@ -1,4 +1,4 @@
-package com.ali.trace.spy.intercepter;
+package com.ali.trace.spy.interceptor;
 
 /**
  * do around method except exception
@@ -6,7 +6,7 @@ package com.ali.trace.spy.intercepter;
  * @author nkhanlang@163.com
  *
  */
-public interface IIntercepter {
+public interface IInterceptor {
 
 	/**
 	 * do before with class and method name

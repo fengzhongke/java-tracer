@@ -43,4 +43,29 @@ public class TraceVO {
     public void setMetas(Map<Long, String[]> metas) {
         this.metas = metas;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"type\":\"").append(type).append("\"");
+        if (node != null) {
+            sb.append(",\"node\":").append(node);
+        }
+        sb.append(",\"metas\":{");
+        String splitter = "";
+        for (Map.Entry<Long, String[]> entry : metas.entrySet()) {
+            sb.append(splitter).append("\"").append(entry.getKey()).append("\":[");
+            String s = "";
+            for (String item : entry.getValue()) {
+                sb.append(s).append("\"").append(item).append("\"");
+                s = ",";
+            }
+            sb.append("]");
+            splitter = ",";
+        }
+        sb.append("}");
+        sb.append("}");
+        return sb.toString();
+    }
 }

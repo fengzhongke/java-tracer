@@ -2,8 +2,15 @@ package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.ConfigPool.LoaderSet;
+import com.ali.trace.spy.interceptor.CommonTreeInterceptor;
+import com.ali.trace.spy.interceptor.CompressTreeInterceptor;
+import com.ali.trace.spy.jetty.vo.ConfigVO;
 import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.MetaVO;
+import com.ali.trace.spy.jetty.vo.SetVO;
 import com.ali.trace.spy.xml.XmlNode;
+
+import org.apache.commons.lang.math.NumberUtils;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -22,7 +29,54 @@ import java.util.TreeSet;
  */
 public class ClassHandler implements ITraceHttpHandler {
 
-    @TracerPath(value = "/class", order = 10)
+    @TracerPath(value = "/class", order = 1)
+    @TraceView
+    public String index(PrintWriter writer) throws IOException {
+        return "class";
+    }
+
+
+    @TracerPath(value = "/class/set", order = 1)
+    public DataRet<String> set(PrintWriter writer, @TraceParam("class") String cname,
+        @TraceParam("include") String include,
+        @TraceParam("exclude") String exclude) throws IOException {
+        DataRet<String> ret = null;
+        try {
+            ConfigPool.getPool().resetConfig(include, exclude);
+            ret = new DataRet(true, 0, "redefine succeed!");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "redefine failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/get", order = 1)
+    public DataRet<ConfigVO> get() throws IOException {
+        DataRet<ConfigVO> ret = null;
+        try {
+            List<String> config = ConfigPool.getPool().getConfig();
+            ConfigVO configVO = new ConfigVO(config.get(0), config.get(1));
+            ret = new DataRet<ConfigVO>(true, 0, "get ok");
+            ret.setData(configVO);
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "get failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/redefine", order = 10)
+    public DataRet<String> redefineType(@TraceParam("type")String type) throws IOException {
+        DataRet<String> ret = null;
+        try {
+            ConfigPool.getPool().redefine(Integer.valueOf(type));
+            ret = new DataRet(true, 0, "redefine type failed");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "redefine type failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/get.xml", order = 10)
     public void thread(PrintWriter writer) throws IOException {
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
         ConfigPool pool = ConfigPool.getPool();
@@ -43,29 +97,6 @@ public class ClassHandler implements ITraceHttpHandler {
         root.write(writer);
     }
 
-    @TracerPath(value = "/class/redefine", order = 10)
-    public DataRet<String> redefine(@TraceParam("lid")String loaderId, @TraceParam("cname")String cname) throws IOException {
-        DataRet<String> ret = null;
-        try {
-            ClassLoader loader = ConfigPool.getPool().redefine(Integer.valueOf(loaderId), cname);
-            ret = new DataRet(true, 0, "redefine class[" + cname + "]lid[" + loaderId + "]loader[" + loader + "]");
-        } catch (Exception e) {
-            ret = new DataRet(false, -1, "redefine class[" + cname + "]lid[" + loaderId + "]failed" + e.getMessage());
-        }
-        return ret;
-    }
-
-    @TracerPath(value = "/class/redefineType", order = 10)
-    public DataRet<String> redefineType(@TraceParam("type")String type) throws IOException {
-        DataRet<String> ret = null;
-        try {
-            ConfigPool.getPool().redefine(Integer.valueOf(type));
-            ret = new DataRet(true, 0, "redefine type failed");
-        } catch (Exception e) {
-            ret = new DataRet(false, -1, "redefine type failed" + e.getMessage());
-        }
-        return ret;
-    }
 
     class RootNode extends LoaderNode {
         List<LoaderNode> children = new ArrayList<LoaderNode>();

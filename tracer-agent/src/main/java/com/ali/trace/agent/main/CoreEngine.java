@@ -1,29 +1,34 @@
 package com.ali.trace.agent.main;
 
 import com.ali.trace.agent.inject.TraceEnhance;
-import com.ali.trace.spy.intercepter.CommonIntercepter;
-import com.ali.trace.spy.intercepter.CompressIntercepter;
-import com.ali.trace.spy.intercepter.CompressTreeIntercepter;
+import com.ali.trace.spy.interceptor.CommonInterceptor;
+import com.ali.trace.spy.interceptor.CompressInterceptor;
+import com.ali.trace.spy.interceptor.CompressTreeInterceptor;
 
 import java.lang.instrument.Instrumentation;
 import java.util.HashMap;
 import java.util.Map;
+
 /**
  * @author nkhanlang@163.com
  */
 public class CoreEngine {
 
-    private static String INTERCEPTER = "intercepter";
+    private static String interceptor = "interceptor";
+
     private static String CLASS = "class";
+
     private static String METHOD = "method";
+
     private static String PATH = "path";
+
     private static String ONLINE = "online";
 
     //private static TraceTransformer transformer = new TraceTransformer();
 
     public static void process(String args, Instrumentation inst) {
         String path = null;
-        String intercepter = null;
+        String interceptor = null;
         Map<String, String> map = new HashMap<String, String>();
         if (args != null) {
             String[] items = args.split("#");
@@ -34,23 +39,23 @@ public class CoreEngine {
                 }
             }
         }
-        intercepter = map.get(INTERCEPTER);
+        interceptor = map.get(interceptor);
         path = map.get(PATH);
-        if ("compress".equalsIgnoreCase(intercepter)) {
-            TraceEnhance.setIntecepter(new CompressIntercepter(path));
-        } else if ("stastic".equals(intercepter)) {
+        if ("compress".equalsIgnoreCase(interceptor)) {
+            TraceEnhance.setInterceptor(new CompressInterceptor(path));
+        } else if ("stastic".equals(interceptor)) {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);
             System.out.println("class:[" + clasz + "]method:[" + method + "]");
-            TraceEnhance.setIntecepter(new CompressTreeIntercepter(clasz, method));
-        } else if ("thread".equals(intercepter)) {
+            TraceEnhance.setInterceptor(new CompressTreeInterceptor(clasz, method));
+        } else if ("thread".equals(interceptor)) {
             String clasz = map.get(CLASS);
             String method = map.get(METHOD);
             System.out.println("class:[" + clasz + "]method:[" + method + "]");
-            TraceEnhance.setIntecepter(new CompressTreeIntercepter(clasz, method));
+            TraceEnhance.setInterceptor(new CompressTreeInterceptor(clasz, method));
         } else {
             boolean printTime = Boolean.valueOf(args);
-            TraceEnhance.setIntecepter(new CommonIntercepter(path, printTime));
+            TraceEnhance.setInterceptor(new CommonInterceptor(path, printTime));
         }
         String online = map.get(ONLINE);
         System.out.println("map:" + map);

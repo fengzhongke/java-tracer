@@ -1,17 +1,10 @@
 package com.ali.trace.spy.util;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.lang.reflect.Type;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 
 /**
  * @author nkhanlang@163.com
@@ -19,6 +12,7 @@ import java.util.*;
 public class CompressNode extends BaseNode<CompressNode> {
 
     private long c;
+
     private LinkedHashMap<Long, CompressNode> s = new LinkedHashMap<Long, CompressNode>();
 
     public CompressNode(long id) {
@@ -30,19 +24,21 @@ public class CompressNode extends BaseNode<CompressNode> {
         if (son == null) {
             s.put(id, son = new CompressNode(id));
         }
-        son.c ++;
+        son.c++;
         return son;
     }
 
     public Collection<CompressNode> getSons() {
         return new ArrayList<CompressNode>(s.values());
     }
+
     @Override
     protected StringBuilder buildInner(StringBuilder builder) {
-        builder.append(",'c':");
+        builder.append(",\"c\":");
         builder.append(c);
         return builder;
     }
+
     public void writeFile(Writer writer, int depth) throws IOException {
         if (depth > 0) {
             String[] items = getName(i);
@@ -63,44 +59,44 @@ public class CompressNode extends BaseNode<CompressNode> {
             writer.write(">\r\n");
         }
     }
-
-    public static void main(String[] args) throws IOException {
-        long id = CompressNode.getId("com.test.Service", "main");
-        CompressNode node = new CompressNode(id);
-        node.addSon(CompressNode.getId("com.test.Service", "main1"));
-        node.addSon(CompressNode.getId("com.test.Service1", "main"));
-        node.addSon(CompressNode.getId("com.test.Service1", "main"))
-                .addSon(CompressNode.getId("com.test.Service1", "main"))
-                .addSon(CompressNode.getId("com.test.Service", "main"));
-        BufferedWriter writer = null;
-        try {
-            writer = new BufferedWriter(new FileWriter("/tmp/test.xml"));
-            node.writeFile(writer);
-        } finally {
-            if (writer != null) {
-                writer.close();
-            }
-        }
-        System.out.println(new Gson().toJson(node));
-
-        Map<Integer, Integer> map = new LinkedHashMap<Integer, Integer>();
-        map.put(1, 12);
-        map.put(3, 12);
-        map.put(4, 12);
-        map.put(6, 12);
-        map.put(2, 12);
-        System.out.println("map : " + new Gson().toJson(map));
-
-        System.out.println(new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, new JsonSerializer<LinkedHashMap>() {
-            public JsonElement serialize(LinkedHashMap src, Type typeOfSrc, JsonSerializationContext context) {
-                if(!src.isEmpty()){
-                    return new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, this).create().toJsonTree(src.values());
-                }else{
-                    return null;
-                }
-            }
-        }).create().toJson(node));
-
-    }
+    //
+    // public static void main(String[] args) throws IOException {
+    //     long id = CompressNode.getId("com.test.Service", "main");
+    //     CompressNode node = new CompressNode(id);
+    //     node.addSon(CompressNode.getId("com.test.Service", "main1"));
+    //     node.addSon(CompressNode.getId("com.test.Service1", "main"));
+    //     node.addSon(CompressNode.getId("com.test.Service1", "main"))
+    //             .addSon(CompressNode.getId("com.test.Service1", "main"))
+    //             .addSon(CompressNode.getId("com.test.Service", "main"));
+    //     BufferedWriter writer = null;
+    //     try {
+    //         writer = new BufferedWriter(new FileWriter("/tmp/test.xml"));
+    //         node.writeFile(writer);
+    //     } finally {
+    //         if (writer != null) {
+    //             writer.close();
+    //         }
+    //     }
+    //     System.out.println(new Gson().toJson(node));
+    //
+    //     Map<Integer, Integer> map = new LinkedHashMap<Integer, Integer>();
+    //     map.put(1, 12);
+    //     map.put(3, 12);
+    //     map.put(4, 12);
+    //     map.put(6, 12);
+    //     map.put(2, 12);
+    //     System.out.println("map : " + new Gson().toJson(map));
+    //
+    //     System.out.println(new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, new JsonSerializer<LinkedHashMap>() {
+    //         public JsonElement serialize(LinkedHashMap src, Type typeOfSrc, JsonSerializationContext context) {
+    //             if(!src.isEmpty()){
+    //                 return new GsonBuilder().registerTypeAdapter(LinkedHashMap.class, this).create().toJsonTree(src.values());
+    //             }else{
+    //                 return null;
+    //             }
+    //         }
+    //     }).create().toJson(node));
+    //
+    // }
 
 }

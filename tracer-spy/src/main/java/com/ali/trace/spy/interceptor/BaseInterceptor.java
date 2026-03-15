@@ -1,4 +1,4 @@
-package com.ali.trace.spy.intercepter;
+package com.ali.trace.spy.interceptor;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -14,12 +14,12 @@ import com.ali.trace.spy.helper.ThreadFileNameGenerator;
  * @author nkhanlang@163.com
  *
  */
-public abstract class BaseIntercepter implements IIntercepter {
+public abstract class BaseInterceptor implements IInterceptor {
     private final String path;
     private final ThreadLocal<Writer> t_outs = new ThreadLocal<Writer>();
     private IFileNameGenerator nameGenerator;
 
-    public BaseIntercepter(String path) {
+    public BaseInterceptor(String path) {
         if (path != null) {
             this.path = path;
         } else {

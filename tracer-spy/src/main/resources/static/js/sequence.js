@@ -149,7 +149,7 @@ function DynSeq(parent, node, meta){
                     if(s.hasOwnProperty('s')){
                         for(var j in s.s){
                             var g = s.s[j];
-                            if(m.hasOwnProperty(g.i) && this.meta.type == "CompressTreeIntercepter"){
+                            if(m.hasOwnProperty(g.i) && this.meta.type == "CompressTreeinterceptor"){
                                 m[g.i].t += g.t;
                                 m[g.i].c += g.c;
                             }else{
@@ -159,7 +159,7 @@ function DynSeq(parent, node, meta){
                         }
                     }
                 }else{
-                    if(m.hasOwnProperty(s.i) && this.meta.type == "CompressTreeIntercepter"){
+                    if(m.hasOwnProperty(s.i) && this.meta.type == "CompressTreeinterceptor"){
                         m[s.i].t += s.t;
                         m[s.i].c += s.c;
                     }else{

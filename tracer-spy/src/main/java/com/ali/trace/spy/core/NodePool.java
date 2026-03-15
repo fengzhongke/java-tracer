@@ -58,6 +58,8 @@ public class NodePool {
     }
     public long getSize(){return size;}
 
+    public long getInQueue(){return QUEUE.size();}
+
     public Map<Long, RootNode> getNodes(){
         Map<Long, RootNode> map = new HashMap<Long, RootNode>();
         Iterator<RootNode> itr = QUEUE.iterator();
@@ -66,6 +68,10 @@ public class NodePool {
             map.put(root.getId(), root);
         }
         return map;
+    }
+
+    public boolean isFull() {
+        return getInQueue() >= size;
     }
 
     public void addNode(BaseNode node, String type){

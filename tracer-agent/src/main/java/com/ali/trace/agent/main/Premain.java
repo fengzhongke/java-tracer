@@ -23,7 +23,7 @@ import com.ali.trace.agent.loader.SpyClassLoader;
 public class Premain {
 
     private static final String PATH = "/META-INF/lib";
-    private static final String SPY_CLASS = "com.ali.trace.spy.inject.TraceInjecter";
+    private static final String SPY_CLASS = "com.ali.trace.spy.inject.TraceInjector";
     // default port opened by JETTY
     private static final int DEFAULT_PORT = 18902;
     private static final String DEFAULT_CONFIG = "";
@@ -55,7 +55,7 @@ public class Premain {
             }
             String portStr = configs.get(CONFIG_PORT);
             if(portStr != null && portStr != DEFAULT_CONFIG){
-                port = Integer.valueOf(args);
+                port = Integer.valueOf(portStr);
             }
             String sleepStr = configs.get(CONFIG_SLEEP);
             if(sleepStr != null){
@@ -75,6 +75,7 @@ public class Premain {
             }
             Thread.sleep(sleep);
             inst.addTransformer(new TraceTransformer(inject), true);
+
         } catch (Throwable t) {
             t.printStackTrace();
         }
