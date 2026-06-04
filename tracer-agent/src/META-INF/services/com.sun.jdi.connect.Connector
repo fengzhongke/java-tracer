@@ -1,0 +1,4 @@
+com.sun.tools.jdi.RawCommandLineLauncher
+com.sun.tools.jdi.SocketAttachingConnector
+com.sun.tools.jdi.SocketListeningConnector
+com.sun.tools.jdi.ProcessAttachingConnector

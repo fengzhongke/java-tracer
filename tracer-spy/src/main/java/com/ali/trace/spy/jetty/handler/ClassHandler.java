@@ -4,9 +4,12 @@ import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.ConfigPool.LoaderSet;
 import com.ali.trace.spy.interceptor.CommonTreeInterceptor;
 import com.ali.trace.spy.interceptor.CompressTreeInterceptor;
+import com.ali.trace.spy.jetty.vo.ClassTreeVO;
 import com.ali.trace.spy.jetty.vo.ConfigVO;
 import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.LoaderTreeVO;
 import com.ali.trace.spy.jetty.vo.MetaVO;
+import com.ali.trace.spy.jetty.vo.PackageNodeVO;
 import com.ali.trace.spy.jetty.vo.SetVO;
 import com.ali.trace.spy.xml.XmlNode;
 
@@ -18,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,7 +85,7 @@ public class ClassHandler implements ITraceHttpHandler {
         writer.write("<?xml version='1.0' encoding='UTF-8' ?>");
         ConfigPool pool = ConfigPool.getPool();
         RootNode root = new RootNode();
-        for (LoaderSet loader : pool.getLoaderSets()) {
+        for (LoaderSet loader : pool.getAllLoadedClasses()) {
             String name = "";
             if (loader != null) {
                 name = loader.toString().replaceAll("'|<|>|\\$", "_");
@@ -95,6 +99,113 @@ public class ClassHandler implements ITraceHttpHandler {
             }
         }
         root.write(writer);
+    }
+
+    @TracerPath(value = "/class/tree", order = 11)
+    @TraceView
+    public String tree(PrintWriter writer) throws IOException {
+        return "class-tree";
+    }
+
+    @TracerPath(value = "/class/tree.json", order = 12)
+    public DataRet<List<PackageNodeVO>> treeJson(PrintWriter writer) throws IOException {
+        DataRet<List<PackageNodeVO>> ret = new DataRet<List<PackageNodeVO>>(true, 0, "get ok");
+        ConfigPool pool = ConfigPool.getPool();
+
+        // Build package tree for each loader - use getAllLoadedClasses for full class list
+        List<PackageNodeVO> loaderTrees = new ArrayList<PackageNodeVO>();
+        for (LoaderSet loader : pool.getAllLoadedClasses()) {
+            PackageNodeVO loaderRoot = new PackageNodeVO();
+            loaderRoot.setName(loader.toString());
+            loaderRoot.setFullPath(loader.toString());
+
+            // Build package hierarchy for all classes in this loader
+            PackageNodeVO packageRoot = new PackageNodeVO("root", "");
+            for (Entry<String, Integer> entry : loader.getClassNames().entrySet()) {
+                String className = entry.getKey();
+                int type = entry.getValue();
+                addClassToPackageTree(packageRoot, className, type, loader.getId());
+            }
+
+            // Calculate totals and sort children
+            packageRoot.calculateTotals();
+            sortPackageChildren(packageRoot);
+
+            // Add package children to loader root
+            loaderRoot.setChildren(packageRoot.getChildren());
+            loaderRoot.setTotalCount(packageRoot.getTotalCount());
+            loaderRoot.setWovenCount(packageRoot.getWovenCount());
+            loaderTrees.add(loaderRoot);
+        }
+
+        // Sort loaders by total count
+        Collections.sort(loaderTrees, new Comparator<PackageNodeVO>() {
+            public int compare(PackageNodeVO o1, PackageNodeVO o2) {
+                return o2.getTotalCount() - o1.getTotalCount();
+            }
+        });
+
+        ret.setData(loaderTrees);
+        return ret;
+    }
+
+    /**
+     * Add a class to the package tree hierarchy
+     */
+    private void addClassToPackageTree(PackageNodeVO root, String className, int type, int loaderId) {
+        // Split class name into package parts: com/english/api/controller/GlobalExceptionHandler
+        String[] parts = className.split("/");
+        if (parts.length == 0) return;
+
+        PackageNodeVO current = root;
+        StringBuilder fullPath = new StringBuilder();
+
+        // Walk through package levels (except last part which is the class name)
+        for (int i = 0; i < parts.length - 1; i++) {
+            String part = parts[i];
+            if (fullPath.length() > 0) fullPath.append("/");
+            fullPath.append(part);
+
+            PackageNodeVO child = current.getChild(part);
+            if (child == null) {
+                child = new PackageNodeVO(part, fullPath.toString());
+                current.addChild(child);
+            }
+            current = child;
+        }
+
+        // Add the class as a leaf node with wovenCount and totalCount
+        String classSimpleName = parts[parts.length - 1];
+        PackageNodeVO classNode = new PackageNodeVO(classSimpleName, className);
+        classNode.setClass(true);
+        classNode.setType(type);
+        classNode.setLoaderId(loaderId);
+        // Each class: totalCount=1, wovenCount=1 if type=1 else 0
+        classNode.setTotalCount(1);
+        classNode.setWovenCount(type == 1 ? 1 : 0);
+        current.addChild(classNode);
+    }
+
+    /**
+     * Sort package children alphabetically
+     */
+    private void sortPackageChildren(PackageNodeVO node) {
+        if (node.getChildren() == null || node.getChildren().isEmpty()) return;
+
+        Collections.sort(node.getChildren(), new Comparator<PackageNodeVO>() {
+            public int compare(PackageNodeVO o1, PackageNodeVO o2) {
+                // Packages first, then classes
+                if (o1.isClass() != o2.isClass()) {
+                    return o1.isClass() ? 1 : -1;
+                }
+                return o1.getName().compareTo(o2.getName());
+            }
+        });
+
+        // Recursively sort children
+        for (PackageNodeVO child : node.getChildren()) {
+            sortPackageChildren(child);
+        }
     }
 
 

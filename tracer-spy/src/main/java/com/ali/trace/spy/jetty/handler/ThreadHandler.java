@@ -1,5 +1,7 @@
 package com.ali.trace.spy.jetty.handler;
 
+import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.ThreadNodeVO;
 import com.ali.trace.spy.xml.XmlNode;
 
 import java.io.IOException;
@@ -17,6 +19,77 @@ import java.util.Map.Entry;
  * @author nkhanlang@163.com
  */
 public class ThreadHandler implements ITraceHttpHandler {
+
+    @TracerPath(value = "/thread/tree", order = 1)
+    @TraceView
+    public String index(PrintWriter writer) throws IOException {
+        return "thread-tree";
+    }
+
+    @TracerPath(value = "/thread/tree.json", order = 2)
+    public DataRet<List<ThreadNodeVO>> threadJson(PrintWriter writer) throws IOException {
+        DataRet<List<ThreadNodeVO>> ret = new DataRet<List<ThreadNodeVO>>(true, 0, "get ok");
+        Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
+
+        // Build merged tree structure (like get.xml)
+        ThreadNodeVO root = new ThreadNodeVO();
+        root.setName("root");
+
+        for (Entry<Thread, StackTraceElement[]> entry : stackTraces.entrySet()) {
+            Thread thread = entry.getKey();
+            StackTraceElement[] stacks = entry.getValue();
+
+            // Build stack trace tree from bottom to top, merging same paths
+            ThreadNodeVO current = root;
+
+            for (int i = stacks.length - 1; i >= 0; i--) {
+                StackTraceElement stack = stacks[i];
+                String key = stack.getClassName() + "#" + stack.getMethodName() + "#" + stack.getLineNumber();
+
+                ThreadNodeVO frameNode = current.getChild(key);
+                if (frameNode == null) {
+                    frameNode = new ThreadNodeVO();
+                    frameNode.setName(stack.getMethodName());
+                    frameNode.setFullName(stack.getClassName() + "." + stack.getMethodName());
+                    frameNode.setClassName(stack.getClassName());
+                    frameNode.setLineNumber(stack.getLineNumber());
+                    frameNode.setIsFrame(true);
+                    current.addChildByKey(key, frameNode);
+                }
+                frameNode.incCount();
+                current = frameNode;
+            }
+
+            // Add thread info at the leaf
+            if (current != null && current != root) {
+                ThreadNodeVO threadLeaf = new ThreadNodeVO();
+                threadLeaf.setName(thread.getName());
+                threadLeaf.setId(thread.getId());
+                threadLeaf.setState(thread.getState().name());
+                threadLeaf.setIsThread(true);
+                current.addChild(threadLeaf);
+            }
+        }
+
+        // Get root children and sort by count
+        List<ThreadNodeVO> result = root.getChildren();
+        sortAndClean(result);
+        ret.setData(result);
+        return ret;
+    }
+
+    private void sortAndClean(List<ThreadNodeVO> nodes) {
+        Collections.sort(nodes, new Comparator<ThreadNodeVO>() {
+            public int compare(ThreadNodeVO o1, ThreadNodeVO o2) {
+                return o2.getCount() - o1.getCount();
+            }
+        });
+        for (ThreadNodeVO node : nodes) {
+            if (node.getChildren() != null && !node.getChildren().isEmpty()) {
+                sortAndClean(node.getChildren());
+            }
+        }
+    }
 
     @TracerPath(value = "/thread/get.xml", order = 10)
     public void thread(PrintWriter writer) throws IOException {

@@ -1,0 +1,166 @@
+<head>
+    <title></title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2" media="print">
+    <style>
+        .tree-node { cursor: pointer; }
+        .tree-node:hover { background-color: #f5f5f5; }
+        .tree-icon { margin-right: 5px; }
+        .tree-count { margin-left: 10px; font-weight: normal; }
+        .tree-woven { color: #5cb85c; }
+        .tree-notwoven { color: #d9534f; }
+        .tree-children { display: none; margin-left: 20px; }
+        .tree-children.expanded { display: block; }
+    </style>
+</head>
+
+<body>
+<div class="row clearfix">
+    <div class="col-md-12 column">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">java-tracer</a>
+                </div>
+                <div>
+                    <ul class="nav navbar-nav">
+                        <li><a href="/index">index</a></li>
+                        <li><a href="/class">class</a></li>
+                        <li class="active"><a href="/package">package</a></li>
+                        <li><a href="/unload">unload</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container">
+    <div class="list-group">
+        <a href="#" class="list-group-item active">
+            <h4 class="list-group-item-heading">
+                package statistics
+            </h4>
+        </a>
+        <div class="list-group-item">
+            <div class="row clearfix">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-addon">loader:</span>
+                        <label class="form-control" id="loader_count">0</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-addon">classes:</span>
+                        <label class="form-control" id="total_classes">0</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-addon">woven:</span>
+                        <label class="form-control" id="total_woven" style="color:#5cb85c">0</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-addon">not woven:</span>
+                        <label class="form-control" id="total_notwoven" style="color:#d9534f">0</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="list-group-item">
+            <div class="row clearfix">
+                <div class="col-md-12">
+                    <button class="btn btn-info btn-sm" id="refresh_btn">
+                        <span class="glyphicon glyphicon-refresh"></span> refresh
+                    </button>
+                    <a href="/package/get.xml" class="btn btn-success btn-sm" target="_blank" style="margin-left: 10px;">
+                        <span class="glyphicon glyphicon-download"></span> xml
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="list-group-item" id="tree_container">
+            <div id="package_tree"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+function buildTree(node, level) {
+    var html = '<div class="tree-node" data-path="' + node.fullPath + '" style="padding: 5px 0;">';
+    var icon = node.children && node.children.length > 0 ? 'glyphicon-plus' : 'glyphicon-minus';
+    html += '<span class="glyphicon tree-icon ' + icon + '"></span>';
+    html += '<strong>' + node.name + '</strong>';
+    html += '<span class="tree-count tree-woven">woven: ' + node.totalWoven + '</span>';
+    html += '<span class="tree-count tree-notwoven">not woven: ' + node.totalNotWoven + '</span>';
+    html += '</div>';
+
+    if (node.children && node.children.length > 0) {
+        html += '<div class="tree-children" id="children_' + node.fullPath.replace(/[^a-zA-Z0-9]/g, '_') + '">';
+        for (var i = 0; i < node.children.length; i++) {
+            html += buildTree(node.children[i], level + 1);
+        }
+        html += '</div>';
+    }
+    return html;
+}
+
+function loadData() {
+    $.ajax({
+        url: '/package/get.json',
+        type: 'GET',
+        success: function(ret) {
+            if (ret.status) {
+                var data = ret.data;
+                $('#loader_count').text(data.loaderCount);
+                $('#total_classes').text(data.totalClasses);
+                $('#total_woven').text(data.totalWoven);
+                $('#total_notwoven').text(data.totalNotWoven);
+
+                var treeHtml = '';
+                if (data.packages && data.packages.length > 0) {
+                    for (var i = 0; i < data.packages.length; i++) {
+                        treeHtml += buildTree(data.packages[i], 0);
+                    }
+                } else {
+                    treeHtml = '<p class="text-muted">No packages found</p>';
+                }
+                $('#package_tree').html(treeHtml);
+
+                $('.tree-node').click(function() {
+                    var icon = $(this).find('.tree-icon');
+                    var childrenId = 'children_' + $(this).data('path').replace(/[^a-zA-Z0-9]/g, '_');
+                    var children = $('#' + childrenId);
+                    if (children.length) {
+                        if (children.hasClass('expanded')) {
+                            children.removeClass('expanded');
+                            icon.removeClass('glyphicon-minus').addClass('glyphicon-plus');
+                        } else {
+                            children.addClass('expanded');
+                            icon.removeClass('glyphicon-plus').addClass('glyphicon-minus');
+                        }
+                    }
+                });
+            } else {
+                $('#package_tree').html('<p class="text-danger">Error: ' + ret.msg + '</p>');
+            }
+        },
+        error: function() {
+            $('#package_tree').html('<p class="text-danger">Failed to load data</p>');
+        }
+    });
+}
+
+$('#refresh_btn').click(function() {
+    loadData();
+});
+
+loadData();
+</script>
+</body>
+</html>

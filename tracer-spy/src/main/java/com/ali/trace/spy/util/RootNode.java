@@ -18,6 +18,13 @@ public class RootNode {
         this.start = System.currentTimeMillis();
     }
 
+    public RootNode(long id, BaseNode node, String type, long start) {
+        this.id = id;
+        this.node = node;
+        this.type = type;
+        this.start = start;
+    }
+
     public long getId() {
         return id;
     }
@@ -32,5 +39,28 @@ public class RootNode {
 
     public long getStart() {
         return start;
+    }
+
+    /**
+     * Serialize to JSON string
+     */
+    public String toJson() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"id\":").append(id);
+        sb.append(",\"type\":\"").append(escapeJson(type)).append("\"");
+        sb.append(",\"start\":").append(start);
+        sb.append(",\"node\":");
+        if (node != null) {
+            node.build(sb);
+        } else {
+            sb.append("{}");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

@@ -5,6 +5,7 @@ import com.ali.trace.spy.core.NodePool;
 import com.ali.trace.spy.interceptor.CommonThreadntercepter;
 import com.ali.trace.spy.interceptor.CompressThreadInterceptor;
 import com.ali.trace.spy.jetty.JettyServer;
+import com.ali.trace.spy.jetty.io.AgentResVmLoader;
 
 import org.apache.commons.lang.StringUtils;
 import org.objectweb.asm.ClassReader;
@@ -63,6 +64,9 @@ public class TraceInjector {
         NodePool.getPool().setMode(mode);
         initPrefix();
 
+        // Update Velocity to use current ClassLoader (for hot reload)
+        AgentResVmLoader.updateClassLoader(LOADER);
+
         if (mode == 1) {
             POOL.setinterceptor(new CommonThreadntercepter());
         } else if (mode == 2) {
@@ -77,27 +81,23 @@ public class TraceInjector {
             if (name != null) {
                 if (loader != null && !filter(name)) {
                     byte[] newBytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name),
-                        false).getBytes();
+                        true).getBytes();  // Always use common mode for better compatibility
                     bytes = newBytes;
                     redefinedNames.add(name);
-                    type = 1;
+                    type = 1;  // weave success
                 }
             }
             return bytes;
         } catch (TypeNotPresentException e) {
-            type = 3;
+            // Type not found - skip this class, mark as not woven
+            type = 0;
+            System.out.println("TypeNotPresentException for class: " + name + " - " + e.getMessage());
             throw e;
         } catch (Throwable t) {
-            try {
-                bytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name), true).getBytes();
-                type = 1;
-                return bytes;
-            } catch (Throwable t1) {
-                type = 2;
-                System.err.println("class : " + name);
-                //t1.printStackTrace();
-                throw t1;
-            }
+            // Transformation failed - mark as not woven
+            type = 0;
+            System.err.println("Transform error for class: " + name + " - " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            throw t;
         } finally {
             if (name != null) {
                 POOL.addClass(loader, name, type);

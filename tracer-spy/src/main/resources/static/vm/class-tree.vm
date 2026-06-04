@@ -1,0 +1,115 @@
+<head>
+    <title>Class Tree View</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2">
+    <style>
+        .tree-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .tree-item {
+            cursor: pointer;
+            padding: 3px 5px;
+            margin: 2px 0;
+        }
+        .tree-item:hover {
+            background-color: #f5f5f5;
+        }
+        .tree-icon {
+            margin-right: 5px;
+        }
+        .tree-children {
+            display: none;
+            margin-left: 20px;
+        }
+        .tree-children.expanded {
+            display: block;
+        }
+        .tree-loader {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .tree-class {
+            color: #555;
+        }
+        .type-0 { color: #999; }
+        .type-1 { color: #5cb85c; }
+        .search-box {
+            margin-bottom: 10px;
+        }
+        .stats-info {
+            margin-bottom: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+<div class="row clearfix">
+    <div class="col-md-12 column">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">java-tracer</a>
+                </div>
+                <div>
+                    <ul class="nav navbar-nav">
+                        <li><a href="/index">index</a></li>
+                        <li><a href="/class">class</a></li>
+                        <li><a href="/package">package</a></li>
+                        <li><a href="/unload">unload</a></li>
+                        <li class="active"><a href="/class/tree">class tree</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container">
+    <div class="list-group">
+        <a href="#" class="list-group-item active">
+            <h4 class="list-group-item-heading">Class Loader Tree</h4>
+        </a>
+
+        <div class="list-group-item">
+            <div class="row clearfix search-box">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-addon">Search</span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Filter class name...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary btn-sm" id="expandAll">Expand All</button>
+                    <button class="btn btn-default btn-sm" id="collapseAll">Collapse All</button>
+                </div>
+                <div class="col-md-3">
+                    <a href="/class/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>
+                    <a href="/class/tree.json" class="btn btn-info btn-sm" target="_blank">JSON View</a>
+                </div>
+            </div>
+            <div class="stats-info">
+                <span id="loaderCount">0</span> loaders,
+                <span id="classCount">0</span> classes
+            </div>
+        </div>
+
+        <div class="list-group-item">
+            <div class="tree-container" id="treeContainer">
+                <div id="treeContent">
+                    <span class="text-muted">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/class-tree.js"></script>
+</body>
+</html>

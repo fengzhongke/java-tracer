@@ -1,0 +1,96 @@
+<head>
+    <title></title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2" media="print">
+</head>
+
+<body>
+<div class="row clearfix">
+    <div class="col-md-12 column">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">java-tracer</a>
+                </div>
+                <div>
+                    <ul class="nav navbar-nav">
+                        <li><a href="/index">index</a></li>
+                        <li><a href="/class">class</a></li>
+                        <li><a href="/package">package</a></li>
+                        <li class="active"><a href="/unload">unload</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container">
+    <div class="list-group">
+        <a href="#" class="list-group-item list-group-item-danger">
+            <h4 class="list-group-item-heading">
+                <span class="glyphicon glyphicon-warning-sign"></span> Unload Agent
+            </h4>
+            <p class="list-group-item-text">
+                This will completely unload the java-tracer agent from the current JVM.
+                After unloading, the web interface will become unreachable and all tracing will stop.
+            </p>
+        </a>
+        <div class="list-group-item">
+            <h5>What happens when you unload:</h5>
+            <ul>
+                <li>The interceptor is disabled — all woven <code>s()/e()</code> calls become no-ops</li>
+                <li>The class transformer is removed from the JVM</li>
+                <li>The Jetty web server is stopped</li>
+                <li>All configuration and trace data is cleared</li>
+                <li>The target application continues running normally</li>
+            </ul>
+        </div>
+        <div class="list-group-item" style="text-align: center;">
+            <button class="btn btn-danger btn-lg" id="unload_btn" data-toggle="modal" data-target="#confirmModal">
+                <span class="glyphicon glyphicon-off"></span> Unload Agent Now
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title">Confirm Unload</h4>
+            </div>
+            <div class="modal-body">
+                <p><strong>Are you sure you want to unload the agent?</strong></p>
+                <p>This action cannot be undone. The web interface will stop immediately after unloading.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="unload_confirm">Unload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+jQuery('#unload_confirm').click(function() {
+    jQuery.ajax({
+        url: '/unload/exec',
+        type: 'POST',
+        success: function(data) {
+            jQuery('#confirmModal').modal('hide');
+            jQuery('#unload_btn').prop('disabled', true);
+            jQuery('#unload_btn').html('<span class="glyphicon glyphicon-ok"></span> Agent Unloaded');
+            jQuery('#unload_btn').removeClass('btn-danger').addClass('btn-success');
+            alert('Agent has been unloaded successfully. This page will become unreachable shortly.');
+        },
+        error: function(xhr) {
+            alert('Unload request sent. If the server stops, the agent was unloaded successfully.');
+        }
+    });
+});
+</script>
+</body>

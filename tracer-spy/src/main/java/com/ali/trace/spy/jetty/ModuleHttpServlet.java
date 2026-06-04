@@ -24,14 +24,17 @@ import java.util.Map;
 public class ModuleHttpServlet extends HttpServlet {
 
     /**
-     * 
+     *
      */
     private static final long serialVersionUID = 1L;
 
     public static final String ROOT = "";
     private HandlerConfig config;
+    private VmViewResolver viewResolver;
+
     public ModuleHttpServlet(HandlerConfig config){
         this.config = config;
+        this.viewResolver = new VmViewResolver();
     }
 
     @Override
@@ -75,7 +78,7 @@ public class ModuleHttpServlet extends HttpServlet {
                                 model.putAll((ModelMap)param);
                             }
                         }
-                        VmViewResolver.resolve(viewPath, model, writer);
+                        viewResolver.resolve(viewPath, model, writer);
                     }else{
                         writer.write(ret.toString());
                     }

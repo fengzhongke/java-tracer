@@ -26,6 +26,17 @@ public class AgentResVmLoader extends ResourceLoader {
         }
         return instance;
     }
+
+    /**
+     * Update ClassLoader for hot reload
+     */
+    public static void updateClassLoader(ClassLoader newLoader) {
+        if (instance != null) {
+            instance.loader = newLoader;
+            System.out.println("AgentResVmLoader ClassLoader updated");
+        }
+    }
+
     @Override
     public void init(ExtendedProperties extendedProperties) {
     }

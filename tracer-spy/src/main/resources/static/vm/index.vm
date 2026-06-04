@@ -18,6 +18,8 @@
                     <ul class="nav navbar-nav">
                         <li class="active"><a href="/index">index</a></li>
                         <li><a href="/class">class</a></li>
+                        <li><a href="/package">package</a></li>
+                        <li><a href="/unload">unload</a></li>
                     </ul>
                 </div>
             </div>

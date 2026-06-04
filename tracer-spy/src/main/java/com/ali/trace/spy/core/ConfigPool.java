@@ -39,6 +39,95 @@ public class ConfigPool {
         return INSTANCE;
     }
 
+    /**
+     * Clear all data (for hot reload)
+     */
+    public void clear() {
+        loaderSets.clear();
+        weaveClass = null;
+        inst = null;
+        injector = null;
+        SEQ_SEED.set(0);
+    }
+
+    /**
+     * Unload the agent: disable interceptor, remove transformer, stop Jetty, clear pools.
+     * Uses reflection to call Premain.unload() across the classloader boundary.
+     * Premain is loaded by the bootstrap classloader (Boot-Class-Path in manifest),
+     * so we use Class.forName with null (bootstrap) classloader to find it.
+     */
+    public boolean unload() {
+        try {
+            // Premain and TraceEnhance are both on the bootstrap classpath
+            // (Boot-Class-Path: java-tracer.jar), so use bootstrap loader (null)
+            Class<?> premainClass = Class.forName("com.ali.trace.agent.main.Premain", true, null);
+            java.lang.reflect.Method unloadMethod = premainClass.getMethod("unload");
+            return (Boolean) unloadMethod.invoke(null);
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Get all loaded classes from JVM (not just transformer-processed ones)
+     */
+    public List<LoaderSet> getAllLoadedClasses() {
+        if (inst == null) {
+            return loaderSets;
+        }
+
+        // Build a map of ClassLoader -> List<Class>
+        Map<ClassLoader, List<Class<?>>> loaderClassMap = new ConcurrentHashMap<ClassLoader, List<Class<?>>>();
+        Class<?>[] allClasses = inst.getAllLoadedClasses();
+
+        for (Class<?> clazz : allClasses) {
+            ClassLoader loader = clazz.getClassLoader();
+            // Skip bootstrap loader (null) and array types
+            if (loader != null && !clazz.isArray()) {
+                List<Class<?>> classes = loaderClassMap.get(loader);
+                if (classes == null) {
+                    classes = new ArrayList<Class<?>>();
+                    loaderClassMap.put(loader, classes);
+                }
+                classes.add(clazz);
+            }
+        }
+
+        // Build result list
+        List<LoaderSet> result = new ArrayList<LoaderSet>();
+        for (Map.Entry<ClassLoader, List<Class<?>>> entry : loaderClassMap.entrySet()) {
+            ClassLoader loader = entry.getKey();
+            List<Class<?>> classes = entry.getValue();
+
+            // Find existing LoaderSet or create new
+            LoaderSet loaderSet = getLoaderSet(loader);
+            if (loaderSet == null) {
+                loaderSet = new LoaderSet(SEQ_SEED.incrementAndGet(), loader);
+            }
+
+            // Create a new LoaderSet with all classes
+            LoaderSet fullSet = new LoaderSet(loaderSet.getId(), loader);
+            for (Class<?> clazz : classes) {
+                String name = clazz.getName().replace('.', '/');
+                // Check if this class was woven (type=1) or not (type=0)
+                Integer existingType = loaderSet.classNames.get(name);
+                int type = (existingType != null && existingType == 1) ? 1 : 0;
+                fullSet.classNames.put(name, type);
+            }
+            result.add(fullSet);
+        }
+
+        // Sort by class count
+        Collections.sort(result, new java.util.Comparator<LoaderSet>() {
+            public int compare(LoaderSet o1, LoaderSet o2) {
+                return o2.classNames.size() - o1.classNames.size();
+            }
+        });
+
+        return result;
+    }
+
     public void setInst(Instrumentation inst, TraceInjector injector) {
         this.inst = inst;
         this.injector = injector;
@@ -55,14 +144,21 @@ public class ConfigPool {
         configLines.add("exclude:");
         Collections.addAll(configLines, excludes.split(";"));
         injector.setConfig(configLines);
-        for(LoaderSet loaderSet : loaderSets){
+
+        // Use getAllLoadedClasses to get all classes in JVM
+        List<LoaderSet> allLoaders = getAllLoadedClasses();
+        for(LoaderSet loaderSet : allLoaders){
+            ClassLoader loader = loaderSet.getLoader();
             for (Map.Entry<String, Integer> entry : loaderSet.classNames.entrySet()) {
                 String name = entry.getKey();
-                boolean filter = injector.filter(name);
-                if (!filter && entry.getValue() == 0) {
-                    redefine(loaderSet.getLoader(), name);
-                } else if (filter && entry.getValue() > 0) {
-                    redefine(loaderSet.getLoader(), name);
+                boolean shouldWeave = !injector.filter(name);
+                int currentType = entry.getValue();
+
+                // If should weave but not yet woven, or should not weave but already woven
+                if (shouldWeave && currentType == 0) {
+                    redefine(loader, name);
+                } else if (!shouldWeave && currentType == 1) {
+                    redefine(loader, name);
                 }
             }
         }

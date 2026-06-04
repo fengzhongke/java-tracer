@@ -1,7 +1,5 @@
 package com.ali.trace.spy.jetty.vo;
 
-import org.apache.commons.lang.StringUtils;
-
 /**
  * @author nkhanlang@163.com
  * @date 2019-08-21 00:51
@@ -9,9 +7,10 @@ import org.apache.commons.lang.StringUtils;
 public class ConfigVO {
     private String include;
     private String exclude;
+
     public ConfigVO(String include, String exclude){
-        this.include = include;
-        this.exclude = exclude;
+        this.include = include != null ? include : "";
+        this.exclude = exclude != null ? exclude : "";
     }
 
     public String getInclude() {
@@ -19,7 +18,7 @@ public class ConfigVO {
     }
 
     public void setInclude(String include) {
-        this.include = include;
+        this.include = include != null ? include : "";
     }
 
     public String getExclude() {
@@ -27,23 +26,19 @@ public class ConfigVO {
     }
 
     public void setExclude(String exclude) {
-        this.exclude = exclude;
+        this.exclude = exclude != null ? exclude : "";
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("{");
-        String splliter = "";
-        if (StringUtils.isNotBlank(include)) {
-            sb.append(splliter).append("\"include\":\"").append(include).append("\"");
-            splliter = ",";
-        }
-        if (StringUtils.isNotBlank(exclude)) {
-            sb.append(splliter).append("\"exclude\":\"").append(exclude).append("\"");
-            splliter = ",";
-        }
-        sb.append("}");
+        sb.append("{\"include\":\"").append(escapeJson(include)).append("\"");
+        sb.append(",\"exclude\":\"").append(escapeJson(exclude)).append("\"}");
         return sb.toString();
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }
