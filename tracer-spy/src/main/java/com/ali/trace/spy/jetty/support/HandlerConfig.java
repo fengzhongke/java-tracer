@@ -1,5 +1,6 @@
 package com.ali.trace.spy.jetty.support;
 
+import com.ali.trace.spy.jetty.handler.InvokeHandler;
 import com.ali.trace.spy.jetty.handler.ClassHandler;
 import com.ali.trace.spy.jetty.handler.ITraceHttpHandler;
 import com.ali.trace.spy.jetty.handler.ITraceHttpHandler.TracerPath;
@@ -30,6 +31,7 @@ public class HandlerConfig {
         setDefaultModule(handler);
         addHandler(new ThreadHandler());
         addHandler(new ClassHandler());
+        addHandler(new InvokeHandler());
         addHandler(new TraceHandler());
         addHandler(new StaticHandler());
         addHandler(new PackageHandler());

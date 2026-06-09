@@ -133,6 +133,10 @@ public class ConfigPool {
         this.injector = injector;
     }
 
+    public Instrumentation getInst() {
+        return inst;
+    }
+
     public boolean isRedefine(ClassLoader loader, String name){
         return loader == redefineLoader && name.equalsIgnoreCase(redefineName);
     }
@@ -252,7 +256,7 @@ public class ConfigPool {
         return new ArrayList<LoaderSet>(loaderSets);
     }
 
-    private LoaderSet getLoaderSet(int id){
+    public LoaderSet getLoaderSet(int id){
         LoaderSet loaderSet = null;;
         for (LoaderSet set : loaderSets) {
             if (set.id == id) {

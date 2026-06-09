@@ -3,11 +3,9 @@ package com.ali.trace.agent.main;
 import java.io.*;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Method;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 import com.ali.trace.agent.inject.TraceEnhance;
 import com.ali.trace.agent.inject.TraceTransformer;
@@ -325,39 +323,32 @@ public class Premain {
         if ((inject = INJECT.get()) == null) {
             synchronized (Premain.class) {
                 if ((inject = INJECT.get()) == null) {
-                    String path = Premain.class.getResource(PATH).getPath();
-                    if (path.endsWith(PATH)) {
-                        path = path.substring(0, path.length() - PATH.length() - 1);
-                    }
+                    String jarPath = getJarFilePath();
                     try {
-                        JarInputStream jarInput = null;
-                        try {
-                            jarInput = new JarInputStream(new URL(path).openStream());
-                            JarEntry entry = null;
-                            while ((entry = jarInput.getNextJarEntry()) != null) {
-                                String entryName = "/" + entry.getName();
-                                if (entryName.startsWith(PATH) && entryName.endsWith(".jar")) {
-                                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                        // Read tracer-spy JARs from disk via JarFile (not URL stream)
+                        // This ensures hot reload gets the latest rebuilt version
+                        // rather than the bootstrap classloader's cached content
+                        java.util.jar.JarFile agentJar = new java.util.jar.JarFile(jarPath);
+                        java.util.Enumeration<java.util.jar.JarEntry> entries = agentJar.entries();
+                        while (entries.hasMoreElements()) {
+                            java.util.jar.JarEntry e = entries.nextElement();
+                            String entryName = "/" + e.getName();
+                            if (entryName.startsWith(PATH) && entryName.endsWith(".jar")) {
+                                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                                InputStream is = agentJar.getInputStream(e);
+                                try {
                                     int chunk = 0;
                                     byte[] data = new byte[256];
-                                    while (-1 != (chunk = jarInput.read(data))) {
+                                    while (-1 != (chunk = is.read(data))) {
                                         bytes.write(data, 0, chunk);
                                     }
-                                    data = bytes.toByteArray();
-                                    LOADER.load(new ByteArrayInputStream(data, 0, data.length));
+                                } finally {
+                                    is.close();
                                 }
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        } finally {
-                            if (jarInput != null) {
-                                try {
-                                    jarInput.close();
-                                } catch (IOException e1) {
-                                    e1.printStackTrace();
-                                }
+                                LOADER.load(new ByteArrayInputStream(bytes.toByteArray()));
                             }
                         }
+                        agentJar.close();
                         Class<?> injectClass = LOADER.loadClass(SPY_CLASS);
                         INJECT.set(inject =
                             injectClass.getConstructor(Instrumentation.class, Class.class, int.class, int.class)

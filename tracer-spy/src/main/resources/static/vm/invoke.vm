@@ -1,0 +1,288 @@
+<head>
+    <title>Invoke Chain</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2">
+    <style>
+        /* === Simplified Chain Builder === */
+
+        /* Chain step row */
+        .chain-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 6px;
+            background: #fff;
+        }
+        .chain-step:hover { border-color: #aaa; }
+        .chain-step.step-method { border-left: 3px solid #5bc0de; }
+        .chain-step.step-field  { border-left: 3px solid #f0ad4e; }
+        .chain-step.step-classref { border-left: 3px solid #31708f; }
+        .chain-step.step-static { border-left: 3px solid #3c763d; }
+
+        /* Step number */
+        .step-num {
+            font-weight: bold; color: #5bc0de; flex-shrink: 0;
+            font-size: 14px; min-width: 18px;
+        }
+
+        /* Step content (takes remaining width) */
+        .step-content { flex: 1; min-width: 0; }
+
+        /* Step header: badge + name + remove */
+        .step-header {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .type-badge {
+            font-size: 10px; padding: 1px 5px; border-radius: 2px;
+            display: inline-block; flex-shrink: 0;
+        }
+        .type-badge.badge-method { background: #d9edf7; color: #31708f; }
+        .type-badge.badge-field  { background: #fcf8e3; color: #8a6d3b; }
+        .type-badge.badge-static { background: #dff0d8; color: #3c763d; }
+        .type-badge.badge-classref { background: #d9edf7; color: #31708f; }
+        .step-name { font-weight: bold; color: #31708f; font-size: 13px; }
+
+        /* Step params (inline) */
+        .step-params {
+            margin-top: 4px; padding-left: 16px;
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+
+        /* Param inline display */
+        .param-inline {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 12px;
+        }
+        .param-type-label { color: #999; font-size: 11px; }
+        .param-tab-null, .param-tab-value, .param-tab-chain {
+            font-size: 10px; padding: 1px 5px; border-radius: 2px;
+            cursor: pointer; border: 1px solid transparent; background: #f5f5f5; color: #999;
+        }
+        .param-tab-null:hover { background: #e8e8e8; }
+        .param-tab-value:hover { background: #e0e0e0; }
+        .param-tab-chain:hover { background: #fcf8e3; color: #8a6d3b; }
+        .param-tab-null.active { background: #e8e8e8; color: #333; border-color: #ccc; }
+        .param-tab-value.active { background: #dff0d8; color: #3c763d; border-color: #3c763d; }
+        .param-tab-chain.active { background: #fcf8e3; color: #8a6d3b; border-color: #f0ad4e; }
+        .param-value-input {
+            width: 150px; height: 24px; font-size: 12px; padding: 2px 6px;
+        }
+        .param-val-subchain-inline {
+            background: #fcf8e3; border-radius: 2px;
+            padding: 1px 4px; color: #8a6d3b; font-size: 12px;
+        }
+        .param-sep { color: #999; font-size: 11px; }
+
+        /* Inline result (in the step-name line) */
+        .step-name .ret-type { color: #31708f; font-size: 12px; }
+        .step-name .ret-value { color: #3c763d; font-weight: bold; font-size: 12px; }
+        .step-name .ret-duration { color: #999; font-size: 11px; }
+        .step-name .ret-error { color: #a94442; font-size: 12px; }
+
+        /* Step actions */
+        .step-actions {
+            margin-top: 6px; display: flex; gap: 6px;
+        }
+
+        /* Arrow between steps */
+
+        /* Add step area */
+        .chain-add-area {
+            text-align: center; padding: 10px;
+        }
+
+        /* Empty state */
+        .chain-empty {
+            text-align: center; padding: 30px; color: #999;
+            font-size: 14px; border: 1px dashed #ddd; border-radius: 4px;
+        }
+
+        /* Sub-chain (recursive nesting) */
+        .sub-chain {
+            margin-left: 20px; margin-top: 4px;
+            border-left: 2px solid #5bc0de; padding-left: 8px;
+        }
+        .sub-chain.depth-2 { border-left-color: #f0ad4e; }
+        .sub-chain.depth-3 { border-left-color: #3c763d; }
+        .sub-chain.depth-4 { border-left-color: #d9534f; }
+
+        /* Result display */
+        .result-step {
+            padding: 6px 10px; border-left: 3px solid #3c763d;
+            margin-bottom: 4px; background: #dff0d8; border-radius: 0 4px 4px 0;
+        }
+        .result-step.result-error { background: #f2dede; border-left-color: #a94442; }
+        .result-sig { font-weight: bold; }
+        .result-value { color: #3c763d; }
+        .result-value-error { color: #a94442; }
+        .result-meta { color: #999; font-size: 11px; }
+
+        /* Member selector modal */
+        .ms-search-bar {
+            display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+        }
+        .ms-class-label {
+            font-weight: bold; color: #31708f; font-size: 14px;
+        }
+        .ms-change-btn { font-size: 11px; }
+        .class-list {
+            max-height: 250px; overflow-y: auto;
+            border: 1px solid #ddd; padding: 4px; margin-top: 6px;
+        }
+        .class-item {
+            cursor: pointer; padding: 4px 6px; margin: 1px 0; border-radius: 2px;
+        }
+        .class-item:hover { background: #d9edf7; }
+        .member-list {
+            max-height: 350px; overflow-y: auto;
+            border: 1px solid #ddd; border-radius: 4px; padding: 4px;
+        }
+        .member-item {
+            cursor: pointer; padding: 4px 6px; margin: 1px 0;
+            border-radius: 2px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .member-item:hover { background: #d9edf7; }
+        .member-item.field-item:hover { background: #fcf8e3; }
+        .member-name { font-weight: bold; font-size: 13px; }
+        .member-sig { color: #999; font-size: 12px; text-align: right; }
+        .member-section-header {
+            font-weight: bold; padding: 4px 6px; margin-top: 4px;
+            color: #666; border-bottom: 1px solid #ddd; font-size: 12px;
+        }
+
+        /* Peek indicator */
+        .peek-indicator { color: #f0ad4e; font-style: italic; font-size: 12px; }
+
+        /* JSON editor */
+        #json_editor textarea { font-family: monospace; font-size: 12px; min-height: 200px; }
+
+        /* Misc */
+        .invoke-section { border: 1px solid #ddd; border-top: none; padding: 15px; background: #fff; }
+    </style>
+</head>
+
+<body>
+<div class="row clearfix">
+    <div class="col-md-12 column">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">java-tracer</a>
+                </div>
+                <div>
+                    <ul class="nav navbar-nav">
+                        <li><a href="/index">index</a></li>
+                        <li><a href="/class">class</a></li>
+                        <li><a href="/package">package</a></li>
+                        <li><a href="/unload">unload</a></li>
+                        <li class="active"><a href="/invoke">invoke</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<div class="container">
+    <div class="list-group">
+        <!-- Header -->
+        <a href="#" class="list-group-item active">
+            <h4 class="list-group-item-heading">Invoke Chain</h4>
+        </a>
+
+        <!-- Chain area -->
+        <div class="list-group-item" id="chain_area">
+            <div id="chain_container"></div>
+            <div id="chain_empty_state" class="chain-empty">
+                <button class="btn btn-primary" onclick="addFirstStep()" style="margin-top:10px;">
+                    <span class="glyphicon glyphicon-plus"></span> Add First Step
+                </button>
+            </div>
+        </div>
+
+        <!-- Global actions -->
+        <div class="list-group-item">
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="invokeChain()">
+                    <span class="glyphicon glyphicon-play"></span> Invoke
+                </button>
+                <button class="btn btn-default" onclick="clearChain()">
+                    <span class="glyphicon glyphicon-erase"></span> Clear
+                </button>
+                <button class="btn btn-default" onclick="openJsonEditor()">
+                    <span class="glyphicon glyphicon-code"></span> JSON
+                </button>
+            </div>
+        </div>
+
+        <!-- Result display -->
+        <div class="list-group-item" id="invoke_result" style="display:none;">
+            <h4 style="margin:0 0 8px;">Result</h4>
+            <div id="result_container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Member Selector modal -->
+<div class="modal fade" id="member_select_modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="ms_modal_title">Select Member</h4>
+            </div>
+            <div class="modal-body">
+                <!-- Class search -->
+                <div id="ms_class_area">
+                    <div class="ms-search-bar">
+                        <span id="ms_class_label" class="ms-class-label"></span>
+                        <button class="btn btn-default btn-xs ms-change-btn" onclick="msShowClassSearch()" id="ms_change_class_btn" style="display:none;">
+                            <span class="glyphicon glyphicon-search"></span> Change
+                        </button>
+                    </div>
+                    <div id="ms_class_search_area" style="display:none;">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="ms_class_search_input" placeholder="Search class name...">
+                            <span class="input-group-btn">
+                                <button class="btn btn-primary" onclick="msSearchClasses()"><span class="glyphicon glyphicon-search"></span></button>
+                            </span>
+                        </div>
+                        <div id="ms_class_list" class="class-list"></div>
+                    </div>
+                </div>
+                <!-- Member list -->
+                <div id="ms_member_list" class="member-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JSON Editor modal -->
+<div class="modal fade" id="json_modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title">JSON Editor</h4>
+            </div>
+            <div class="modal-body" id="json_editor">
+                <textarea class="form-control" id="json_textarea" rows="15" placeholder='JSON request body'></textarea>
+                <div class="btn-group" style="margin-top:8px;">
+                    <button class="btn btn-primary" onclick="importJsonToForm()"><span class="glyphicon glyphicon-arrow-down"></span> Import</button>
+                    <button class="btn btn-success" onclick="exportFormToJson()"><span class="glyphicon glyphicon-arrow-up"></span> Export</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/invoke.js"></script>
+</body>

@@ -127,7 +127,7 @@ public class ModuleHttpServlet extends HttpServlet {
             }
             return params;
         }
-        return null;
+        return new Object[0];
     }
 
 }
