@@ -390,16 +390,30 @@ function renderStep(step, index, parentPathPrefix) {
 
     html += '<div class="step-content">';
 
-    // Header
+    // Header — type badge is the invoke button
     html += '<div class="step-header">';
-    if (step.callType === 'field') {
-        html += '<span class="type-badge badge-field">field</span>';
-        if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
-    } else if (step.callType === 'classRef') {
-        html += '<span class="type-badge badge-classref">Class</span>';
+    if (!parentPathPrefix) {
+        // Main chain — invoke up to this step
+        if (step.callType === 'field') {
+            html += '<button class="type-badge badge-field" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">field</button>';
+            if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
+        } else if (step.callType === 'classRef') {
+            html += '<button class="type-badge badge-classref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">Class</button>';
+        } else {
+            html += '<button class="type-badge badge-method" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">method</button>';
+            if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
+        }
     } else {
-        html += '<span class="type-badge badge-method">method</span>';
-        if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
+        // Sub-chain — invoke this sub-chain
+        if (step.callType === 'field') {
+            html += '<button class="type-badge badge-field" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">field</button>';
+            if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
+        } else if (step.callType === 'classRef') {
+            html += '<button class="type-badge badge-classref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">Class</button>';
+        } else {
+            html += '<button class="type-badge badge-method" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">method</button>';
+            if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
+        }
     }
     html += '<span class="step-name">';
     if (step.callType === 'classRef') {
@@ -443,11 +457,9 @@ function renderStep(step, index, parentPathPrefix) {
         }
     }
 
-    // Actions ? every step has Invoke, last step also has Add Next
+    // Actions — last step has Add Next
     html += '<div class="step-actions">';
     if (!parentPathPrefix) {
-        // Main chain step ? invoke up to this step
-        html += '<button class="btn btn-success btn-xs" onclick="invokeChainUpTo(' + index + ')"><span class="glyphicon glyphicon-play"></span> Invoke</button>';
         var stepsArr = chainSteps;
         if (stepsArr && index === stepsArr.length - 1) {
             var retHint = step._returnTypeHint || step.returnType || '';
@@ -456,8 +468,6 @@ function renderStep(step, index, parentPathPrefix) {
             }
         }
     } else {
-        // Sub-chain step ? invoke this sub-chain
-        html += '<button class="btn btn-success btn-xs" onclick="invokeSubChain(\'' + parentPathPrefix + '\')"><span class="glyphicon glyphicon-play"></span> Invoke</button>';
         var subStepsArr = getSubStepsByPathPrefix(parentPathPrefix);
         if (subStepsArr && index === subStepsArr.length - 1) {
             var retHint = step._returnTypeHint || step.returnType || '';

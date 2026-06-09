@@ -39,12 +39,15 @@
         }
         .type-badge {
             font-size: 10px; padding: 1px 5px; border-radius: 2px;
-            display: inline-block; flex-shrink: 0;
+            display: inline-block; flex-shrink: 0; border: none; background: none;
         }
-        .type-badge.badge-method { background: #d9edf7; color: #31708f; }
-        .type-badge.badge-field  { background: #fcf8e3; color: #8a6d3b; }
+        .type-badge.badge-method { background: #d9edf7; color: #31708f; cursor: pointer; }
+        .type-badge.badge-method:hover { background: #bde0f2; }
+        .type-badge.badge-field  { background: #fcf8e3; color: #8a6d3b; cursor: pointer; }
+        .type-badge.badge-field:hover { background: #f5e6c8; }
         .type-badge.badge-static { background: #dff0d8; color: #3c763d; }
-        .type-badge.badge-classref { background: #d9edf7; color: #31708f; }
+        .type-badge.badge-classref { background: #d9edf7; color: #31708f; cursor: pointer; }
+        .type-badge.badge-classref:hover { background: #bde0f2; }
         .step-name { font-weight: bold; color: #31708f; font-size: 13px; }
 
         /* Step params (inline) */
