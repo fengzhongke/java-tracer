@@ -349,17 +349,6 @@ function renderChain() {
     for (var i = 0; i < chainSteps.length; i++) {
         html += renderStep(chainSteps[i], i, '');
     }
-    // Bottom area: only show Next Step if chain is non-empty and last step is chainable
-    if (chainSteps.length > 0) {
-        var lastMain = chainSteps[chainSteps.length - 1];
-        var retHint = lastMain._returnTypeHint || lastMain.returnType || '';
-        if (canChainFrom(retHint)) {
-            html += '<div class="chain-add-area">';
-            html += '<button class="btn btn-primary btn-sm" onclick="addNextStep()">';
-            html += '<span class="glyphicon glyphicon-plus"></span> Next ? ' + escapeHtml(retHint) + '</button>';
-            html += '</div>';
-        }
-    }
 
     $('#chain_container').html(html);
 }
@@ -505,14 +494,7 @@ function renderParamInline(step, paramIndex, paramPath) {
     if (param.callType === 'literal') {
         html += ' <input type="text" class="form-control input-sm param-value-input" value="' + escapeAttr(param.value) + '" onchange="updateParamValue(\'' + paramPath + '\',this.value)" placeholder="' + escapeHtml(param.valueType) + ' value">';
     } else if (param.callType === 'subchain') {
-        var subLen = param.subSteps ? param.subSteps.length : 0;
-        if (subLen > 0) {
-            var lastSub = param.subSteps[subLen - 1];
-            var retHint = lastSub._returnTypeHint || lastSub.returnType || '';
-            html += ' <span class="param-val-subchain-inline">→ ' + subLen + ' steps ⇒ ' + escapeHtml(retHint) + '</span>';
-        } else {
-            html += ' <span class="param-val-subchain-inline">→ empty chain</span>';
-        }
+        // No inline text — sub-chain panel below shows the detail
     }
 
     html += '</span>';
@@ -581,18 +563,12 @@ function renderSubchain(param, paramPath) {
         // }
     }
 
-    // Add first step to empty sub-chain, or Next for non-empty
-    html += '<div style="text-align:center;padding:6px;">';
+    // Add first step to empty sub-chain
     if (subSteps.length === 0) {
+        html += '<div style="text-align:center;padding:6px;">';
         html += '<button class="btn btn-primary btn-xs" onclick="addSubStep(\'' + paramPath + '\')"><span class="glyphicon glyphicon-plus"></span> Add First Step</button>';
-    } else {
-        var lastSub = subSteps[subSteps.length - 1];
-        var retHint = lastSub._returnTypeHint || lastSub.returnType || '';
-        if (canChainFrom(retHint)) {
-            html += '<button class="btn btn-primary btn-xs" onclick="addNextSubStep(\'' + paramPath + '\')"><span class="glyphicon glyphicon-plus"></span> Next ? ' + escapeHtml(retHint) + '</button>';
-        }
+        html += '</div>';
     }
-    html += '</div>';
 
     html += '</div>';
     return html;

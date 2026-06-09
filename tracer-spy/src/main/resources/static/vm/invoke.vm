@@ -75,10 +75,6 @@
         .param-value-input {
             width: 150px; height: 24px; font-size: 12px; padding: 2px 6px;
         }
-        .param-val-subchain-inline {
-            background: #fcf8e3; border-radius: 2px;
-            padding: 1px 4px; color: #8a6d3b; font-size: 12px;
-        }
         .param-sep { color: #999; font-size: 11px; }
 
         /* Inline result (in the step-name line) */
