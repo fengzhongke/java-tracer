@@ -505,6 +505,8 @@ function renderParamInline(step, paramIndex, paramPath) {
     // Show current value inline
     if (param.callType === 'literal') {
         html += ' <input type="text" class="form-control input-sm param-value-input" value="' + escapeAttr(param.value) + '" onchange="updateParamValue(\'' + paramPath + '\',this.value)" placeholder="' + escapeHtml(param.valueType) + ' value">';
+    } else if (param.callType === 'classRef') {
+        html += ' <span class="param-val-classref">' + escapeHtml(shortClassName(param.className)) + '.class</span>';
     } else if (param.callType === 'subchain') {
         // No inline text — sub-chain panel below shows the detail
     }

@@ -76,6 +76,10 @@
             width: 150px; height: 24px; font-size: 12px; padding: 2px 6px;
         }
         .param-sep { color: #999; font-size: 11px; }
+        .param-val-classref {
+            background: #d9edf7; border-radius: 2px;
+            padding: 1px 4px; color: #31708f; font-size: 12px;
+        }
 
         /* Inline result (in the step-name line) */
         .step-name .ret-type { color: #31708f; font-size: 12px; }
