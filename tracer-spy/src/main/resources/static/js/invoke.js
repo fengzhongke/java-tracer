@@ -319,18 +319,30 @@ function toggleParamEditor(pathStr) {
 function toggleChainParam(paramPath) {
     var param = getParamByPath(paramPath);
     if (!param) return;
-    if (param.callType !== 'subchain') {
-        // Switch to subchain mode and expand
+    if (param.callType === 'subchain') {
+        // Already subchain — toggle expand/collapse
+        if (expandedEditors[paramPath]) {
+            delete expandedEditors[paramPath];
+        } else {
+            expandedEditors[paramPath] = true;
+        }
+    } else if (param.callType === 'classRef') {
+        // Convert classRef into subchain with classRef as first step
+        var subSteps = [createClassRefStep(param.className, param.loaderId)];
         var step = getStepByPath(paramPath);
         var paramIdx = parseInt(paramPath.split(':').pop());
         var typeHint = param._paramTypeHint || (step ? getParamTypeHint(step, paramIdx) : '') || '';
         replaceParamByPath(paramPath, createSubchainParam(typeHint));
+        // Set subSteps on the newly created subchain param
+        var newParam = getParamByPath(paramPath);
+        newParam.subSteps = subSteps;
         expandedEditors[paramPath] = true;
-    } else if (expandedEditors[paramPath]) {
-        // Collapse
-        delete expandedEditors[paramPath];
     } else {
-        // Expand
+        // null / literal / other — switch to empty subchain
+        var step = getStepByPath(paramPath);
+        var paramIdx = parseInt(paramPath.split(':').pop());
+        var typeHint = param._paramTypeHint || (step ? getParamTypeHint(step, paramIdx) : '') || '';
+        replaceParamByPath(paramPath, createSubchainParam(typeHint));
         expandedEditors[paramPath] = true;
     }
     clearAllResults();
