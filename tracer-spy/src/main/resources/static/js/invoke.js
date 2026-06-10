@@ -136,7 +136,11 @@ function createAutoParam(typeName) {
 
 function shortClassName(fqn) {
     if (!fqn) return '?';
-    var idx = fqn.lastIndexOf('.');
+    // Handle inner classes: com.example.Outer$Inner → "Inner"
+    // Take part after last '$' if present, otherwise part after last '.'
+    var idx = fqn.lastIndexOf('$');
+    if (idx >= 0) return fqn.substring(idx + 1);
+    idx = fqn.lastIndexOf('.');
     return idx >= 0 ? fqn.substring(idx + 1) : fqn;
 }
 
@@ -675,12 +679,15 @@ function addNextStep() {
         return;
     }
     var lastStep = chainSteps[chainSteps.length - 1];
-    var retHint = lastStep._returnTypeHint || lastStep.returnType || '';
+    var realType = lastStep.realReturnType || '';
 
-    if (retHint && retHint !== 'Object' && canChainFrom(retHint)) {
-        msContext = { action: 'addNextStep', returnTypeHint: retHint };
-        autoSearchByReturnType(retHint);
+    // If we have the actual runtime class name from a previous invocation,
+    // directly load its members — no need to re-execute the chain.
+    if (realType && canChainFrom(shortClassName(realType))) {
+        msContext = { action: 'addNextStep', returnTypeHint: shortClassName(realType), currentClassName: realType, currentLoaderId: lastStep.loaderId || 0 };
+        loadMembersForModal(realType, lastStep.loaderId || 0);
     } else {
+        // No realReturnType available (chain not executed yet) — peek first
         invokeForPeek();
     }
 }
@@ -822,12 +829,15 @@ function addNextSubStep(pathPrefix) {
         return;
     }
     var lastSub = subSteps[subSteps.length - 1];
-    var retHint = lastSub._returnTypeHint || lastSub.returnType || '';
+    var realType = lastSub.realReturnType || '';
 
-    if (retHint && retHint !== 'Object' && canChainFrom(retHint)) {
-        msContext = { action: 'addNextSubStep', pathStr: pathPrefix, returnTypeHint: retHint };
-        autoSearchByReturnType(retHint);
+    // If we have the actual runtime class name from a previous invocation,
+    // directly load its members — no need to re-execute the chain.
+    if (realType && canChainFrom(shortClassName(realType))) {
+        msContext = { action: 'addNextSubStep', pathStr: pathPrefix, returnTypeHint: shortClassName(realType), currentClassName: realType, currentLoaderId: lastSub.loaderId || 0 };
+        loadMembersForModal(realType, lastSub.loaderId || 0);
     } else {
+        // No realReturnType available — peek first
         invokeForPeekSub(pathPrefix);
     }
 }
@@ -881,7 +891,7 @@ function invokeForPeek() {
 
     var json = serializeToTree();
     $.ajax({
-        url: '/invoke/exec',
+        url: '/invoke/execMembers.json',
         type: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(json),
@@ -889,33 +899,61 @@ function invokeForPeek() {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data, chainSteps.length);
+                var data = ret.data;
+                // Update invoke results into the chain
+                var invokeResult = data.invokeResult;
+                updateResultsFromTree(invokeResult, chainSteps.length);
                 renderChain();
 
                 var lastStep = chainSteps[chainSteps.length - 1];
-                var actualReturnType = lastStep.returnType || '';
+                var runtimeClassName = data.runtimeClassName || '';
+                var members = data.members || [];
 
-                if (actualReturnType === 'Object' && lastStep.returnValue) {
-                    var extracted = extractClassNameFromReturnValue(lastStep.returnValue);
-                    if (extracted) {
-                        actualReturnType = extracted;
-                        lastStep._returnTypeHint = actualReturnType;
-                    }
-                }
-
+                // If invocation failed, show error
                 if (lastStep.exception) {
                     alert('Invoke failed: ' + lastStep.exception);
                     return;
                 }
 
-                if (!actualReturnType || actualReturnType === 'Object' || !canChainFrom(actualReturnType)) {
+                // Determine actual return type from runtime class name
+                var actualReturnType = runtimeClassName;
+                if (!actualReturnType) {
+                    // Fallback: use returnType from the invoke result
+                    actualReturnType = lastStep.returnType || '';
+                    if (actualReturnType === 'Object' && lastStep.returnValue) {
+                        var extracted = extractClassNameFromReturnValue(lastStep.returnValue);
+                        if (extracted) actualReturnType = extracted;
+                    }
+                }
+                // Set short name for display
+                var shortName = shortClassName(actualReturnType);
+                lastStep._returnTypeHint = shortName;
+
+                if (!actualReturnType || !canChainFrom(shortName)) {
+                    // Return type is void/primitive — no further chaining possible
                     msContext = { action: 'addNextStep' };
                     showMemberSelector();
                     return;
                 }
 
-                msContext = { action: 'addNextStep', returnTypeHint: actualReturnType };
-                autoSearchByReturnType(actualReturnType);
+                // If we got members from runtime type, show them directly
+                if (members.length > 0) {
+                    msContext.currentClassName = actualReturnType;
+                    msContext.currentLoaderId = lastStep.loaderId || 0;
+                    msContext.action = 'addNextStep';
+                    msContext.returnTypeHint = shortName;
+
+                    $('#ms_modal_title').text('Select Member');
+                    $('#ms_class_label').text(actualReturnType);
+                    $('#ms_change_class_btn').show();
+                    $('#ms_class_search_area').hide();
+                    renderMemberList(members, actualReturnType);
+                    $('#member_select_modal').modal('show');
+                } else {
+                    // No members available (e.g., primitive return type) — fall back to class search
+                    msContext = { action: 'addNextStep', returnTypeHint: shortName };
+                    autoSearchByReturnType(shortName);
+                }
             } else {
                 alert('Invoke peek failed: ' + ret.msg);
             }
@@ -935,7 +973,7 @@ function invokeForPeekSub(pathPrefix) {
 
     var json = serializeToTree();
     $.ajax({
-        url: '/invoke/exec',
+        url: '/invoke/execMembers.json',
         type: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(json),
@@ -943,33 +981,54 @@ function invokeForPeekSub(pathPrefix) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data, chainSteps.length);
+                var data = ret.data;
+                var invokeResult = data.invokeResult;
+                updateResultsFromTree(invokeResult, chainSteps.length);
                 renderChain();
 
                 var lastSub = subSteps[subSteps.length - 1];
-                var actualReturnType = lastSub.returnType || '';
-
-                if (actualReturnType === 'Object' && lastSub.returnValue) {
-                    var extracted = extractClassNameFromReturnValue(lastSub.returnValue);
-                    if (extracted) {
-                        actualReturnType = extracted;
-                        lastSub._returnTypeHint = actualReturnType;
-                    }
-                }
+                var runtimeClassName = data.runtimeClassName || '';
+                var members = data.members || [];
 
                 if (lastSub.exception) {
                     alert('Sub-chain invoke failed: ' + lastSub.exception);
                     return;
                 }
 
-                if (!actualReturnType || !canChainFrom(actualReturnType)) {
+                var actualReturnType = runtimeClassName;
+                if (!actualReturnType) {
+                    actualReturnType = lastSub.returnType || '';
+                    if (actualReturnType === 'Object' && lastSub.returnValue) {
+                        var extracted = extractClassNameFromReturnValue(lastSub.returnValue);
+                        if (extracted) actualReturnType = extracted;
+                    }
+                }
+                var shortName = shortClassName(actualReturnType);
+                lastSub._returnTypeHint = shortName;
+
+                if (!actualReturnType || !canChainFrom(shortName)) {
                     msContext = { action: 'addNextSubStep', pathStr: pathPrefix };
                     showMemberSelector();
                     return;
                 }
 
-                msContext = { action: 'addNextSubStep', pathStr: pathPrefix, returnTypeHint: actualReturnType };
-                autoSearchByReturnType(actualReturnType);
+                if (members.length > 0) {
+                    msContext.currentClassName = actualReturnType;
+                    msContext.currentLoaderId = lastSub.loaderId || 0;
+                    msContext.action = 'addNextSubStep';
+                    msContext.pathStr = pathPrefix;
+                    msContext.returnTypeHint = shortName;
+
+                    $('#ms_modal_title').text('Select Member');
+                    $('#ms_class_label').text(actualReturnType);
+                    $('#ms_change_class_btn').show();
+                    $('#ms_class_search_area').hide();
+                    renderMemberList(members, actualReturnType);
+                    $('#member_select_modal').modal('show');
+                } else {
+                    msContext = { action: 'addNextSubStep', pathStr: pathPrefix, returnTypeHint: shortName };
+                    autoSearchByReturnType(shortName);
+                }
             } else {
                 alert('Invoke peek failed: ' + ret.msg);
             }
@@ -995,7 +1054,7 @@ function autoSearchByReturnType(returnType) {
             var bestMatch = null;
             for (var i = 0; i < ret.data.length; i++) {
                 var cn = ret.data[i].name;
-                var simple = cn.lastIndexOf('.') >= 0 ? cn.substring(cn.lastIndexOf('.') + 1) : cn;
+                var simple = shortClassName(cn);
                 if (simple === returnType) { bestMatch = ret.data[i]; break; }
             }
             if (!bestMatch) bestMatch = ret.data[0];
@@ -1146,7 +1205,8 @@ function renderMemberList(members, className) {
             var f = fields[i];
             var info = JSON.stringify({
                 className: className, name: f.name, returnType: f.returnType,
-                isStatic: f.isStatic, isField: true, declaringClass: f.declaringClass || '',
+                isStatic: f.isStatic, isField: true,
+                declaringClass: f.declaringClass || '',
                 loaderId: msContext.currentLoaderId || 0
             });
             html += '<div class="member-item field-item" onclick="msSelectMember(this)" data-member-info="' + escapeAttr(info) + '">';
@@ -1560,10 +1620,13 @@ function mergeResponseToStep(model, resp) {
     // returnType and returnValue: use resp value if present, clear to empty if not.
     // Backend omits these when null (failed step), so resp fields are undefined.
     model.returnType = resp.returnType || '';
+    model.realReturnType = resp.realReturnType || '';
     model.returnValue = resp.returnValue || '';
     model.isVoid = resp.isVoid !== undefined ? resp.isVoid : false;
     model.duration = resp.duration !== undefined ? resp.duration : 0;
     if (!model._returnTypeHint && resp.returnType) model._returnTypeHint = resp.returnType;
+    // realReturnType gives the full runtime class name — use it for next-step resolution
+    if (resp.realReturnType) model.realReturnType = resp.realReturnType;
     // Normalize paramTypes from response (backend returns array, our model uses string)
     if (resp.paramTypes) model.paramTypes = normalizeParamTypes(resp.paramTypes);
 

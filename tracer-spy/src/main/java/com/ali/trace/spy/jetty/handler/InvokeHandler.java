@@ -5,6 +5,7 @@ import com.ali.trace.spy.core.ConfigPool.LoaderSet;
 import com.ali.trace.spy.invoke.InvokeEngine;
 import com.ali.trace.spy.jetty.vo.ClassSearchVO;
 import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.ExecMembersResult;
 import com.ali.trace.spy.jetty.vo.MemberMetaVO;
 import com.ali.trace.spy.jetty.vo.MethodCallNode;
 import com.ali.trace.spy.jetty.vo.MethodMetaVO;
@@ -14,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -78,6 +80,146 @@ public class InvokeHandler implements ITraceHttpHandler {
         } catch (Exception e) {
             return new DataRet<MethodCallNode>(false, -1, "invoke failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Execute the invoke chain, then use the root result's actual runtime type (getClass())
+     * to list all available members — including superclass chain and interface methods.
+     * This replaces the className-based lookup with a runtime type-based lookup,
+     * which correctly handles Spring proxies, runtime subtypes, and inner classes.
+     *
+     * Accepts POST with JSON body (same format as /invoke/exec).
+     * Returns: { status, code, msg, data: ExecMembersResult }
+     */
+    @TracerPath(value = "/invoke/execMembers.json", order = 6)
+    public DataRet<ExecMembersResult> execMembers(HttpServletRequest req) {
+        try {
+            // Step 1: Read and parse JSON body (same as /invoke/exec)
+            BufferedReader reader = new BufferedReader(new InputStreamReader(req.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            String jsonBody = sb.toString();
+
+            if (jsonBody == null || jsonBody.trim().isEmpty()) {
+                return new DataRet<ExecMembersResult>(false, -1, "empty request body");
+            }
+
+            // Step 2: Parse and invoke the chain
+            MethodCallNode rootNode = SimpleJsonParser.parseMethodCallNode(jsonBody);
+            if (rootNode == null) {
+                return new DataRet<ExecMembersResult>(false, -1, "invalid JSON format");
+            }
+
+            rootNode = InvokeEngine.getInstance().invoke(rootNode);
+
+            // Step 3: Get the runtime type from the actual result object
+            Object resolvedValue = rootNode.resolvedValue;
+            ExecMembersResult result = new ExecMembersResult();
+            result.setInvokeResult(rootNode);
+
+            if (resolvedValue == null) {
+                // Invocation succeeded but returned null — cannot determine runtime type
+                // Fall back to returnType string to search for the class
+                String returnTypeName = rootNode.getReturnType() != null ? rootNode.getReturnType() : "";
+                result.setRuntimeClassName(returnTypeName);
+                result.setMembers(null);
+            } else {
+                // Use the actual runtime type: resolvedValue.getClass()
+                Class<?> runtimeClass = resolvedValue.getClass();
+                String runtimeClassName = runtimeClass.getName();
+
+                // Step 4: Collect members from the runtime type (superclass chain + interfaces)
+                List<MemberMetaVO> members = collectMembersFromClass(runtimeClass);
+                result.setRuntimeClassName(runtimeClassName);
+                result.setMembers(members);
+            }
+
+            DataRet<ExecMembersResult> ret = new DataRet<ExecMembersResult>(true, 0, "ok");
+            ret.setData(result);
+            return ret;
+
+        } catch (Exception e) {
+            return new DataRet<ExecMembersResult>(false, -1, "invoke+members failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Collect all members (methods + fields) from a Class object,
+     * walking the superclass chain and including interface methods.
+     */
+    private List<MemberMetaVO> collectMembersFromClass(Class<?> clazz) {
+        List<MemberMetaVO> membersList = new ArrayList<MemberMetaVO>();
+        Set<String> seen = new HashSet<String>();
+        Class<?> originalClazz = clazz;
+
+        // Walk superclass chain
+        while (clazz != null) {
+            // Collect declared methods (includes private/protected, no inherited)
+            for (Method m : clazz.getDeclaredMethods()) {
+                String sig = buildSignature(m);
+                if (seen.contains(sig)) continue;
+                seen.add(sig);
+
+                MemberMetaVO vo = new MemberMetaVO();
+                vo.setName(m.getName());
+                vo.setReturnType(m.getReturnType().getSimpleName());
+                vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                vo.setField(false);
+                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+
+                Class<?>[] paramTypes = m.getParameterTypes();
+                String[] paramTypeNames = new String[paramTypes.length];
+                for (int i = 0; i < paramTypes.length; i++) {
+                    paramTypeNames[i] = paramTypes[i].getSimpleName();
+                }
+                vo.setParamTypes(paramTypeNames);
+                membersList.add(vo);
+            }
+
+            // Collect declared fields (includes private/protected)
+            for (Field f : clazz.getDeclaredFields()) {
+                String fieldKey = "field:" + f.getName();
+                if (seen.contains(fieldKey)) continue;
+                seen.add(fieldKey);
+
+                MemberMetaVO vo = new MemberMetaVO();
+                vo.setName(f.getName());
+                vo.setReturnType(f.getType().getSimpleName());
+                vo.setStatic(Modifier.isStatic(f.getModifiers()));
+                vo.setField(true);
+                vo.setDeclaringClass(f.getDeclaringClass().getSimpleName());
+                vo.setParamTypes(new String[0]);
+                membersList.add(vo);
+            }
+            clazz = clazz.getSuperclass();
+        }
+
+        // Interface methods (public methods including interface defaults)
+        for (Method m : originalClazz.getMethods()) {
+            String sig = buildSignature(m);
+            if (seen.contains(sig)) continue;
+            seen.add(sig);
+
+            MemberMetaVO vo = new MemberMetaVO();
+            vo.setName(m.getName());
+            vo.setReturnType(m.getReturnType().getSimpleName());
+            vo.setStatic(Modifier.isStatic(m.getModifiers()));
+            vo.setField(false);
+            vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+
+            Class<?>[] paramTypes = m.getParameterTypes();
+            String[] paramTypeNames = new String[paramTypes.length];
+            for (int i = 0; i < paramTypes.length; i++) {
+                paramTypeNames[i] = paramTypes[i].getSimpleName();
+            }
+            vo.setParamTypes(paramTypeNames);
+            membersList.add(vo);
+        }
+
+        return membersList;
     }
 
     /**

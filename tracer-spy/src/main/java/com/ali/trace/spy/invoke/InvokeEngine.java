@@ -51,6 +51,7 @@ public class InvokeEngine {
             node.resolvedValue = resolved;
             node.setReturnValue(node.getValue());
             node.setReturnType(node.getValueType());
+            node.setRealReturnType(resolved != null ? resolved.getClass().getName() : "");
             node.setVoid(false);
             node.setDuration(0);
             node.setException(null);
@@ -71,6 +72,7 @@ public class InvokeEngine {
             }
             node.resolvedValue = clazz;
             node.setReturnType("Class");
+            node.setRealReturnType(clazz.getName());
             node.setReturnValue(clazz.getName());
             node.setVoid(false);
             node.setDuration(0);
@@ -148,6 +150,7 @@ public class InvokeEngine {
 
                 node.resolvedValue = result;
                 node.setReturnType(field.getType().getSimpleName());
+                node.setRealReturnType(result != null ? result.getClass().getName() : "");
                 node.setReturnValue(formatResult(result));
                 node.setVoid(false);
                 node.setDuration(elapsed);
@@ -226,6 +229,7 @@ public class InvokeEngine {
                 // Determine return type for display
                 if (result != null) {
                     node.setReturnType(result.getClass().getSimpleName());
+                    node.setRealReturnType(result.getClass().getName());
                 } else if (componentType != null) {
                     node.setReturnType(componentType.getSimpleName());
                 } else {
@@ -367,6 +371,7 @@ public class InvokeEngine {
             long elapsed = System.currentTimeMillis() - start;
 
             node.setReturnType(method.getReturnType().getSimpleName());
+            node.setRealReturnType(result != null ? result.getClass().getName() : "");
             node.setReturnValue(formatResult(result));
             node.setVoid(method.getReturnType() == void.class);
             node.resolvedValue = result;

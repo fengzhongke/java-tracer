@@ -33,6 +33,7 @@ public class MethodCallNode {
 
     // --- Response fields (populated after invocation) ---
     private String returnType;      // return type simple name
+    private String realReturnType;  // return value's actual runtime class full name (e.g. "com.xxx.AuthService$TestImpl")
     private String returnValue;     // toString of return value, truncated
     private boolean isVoid;         // true if method returns void
     private String exception;       // exception message if invocation failed, null if success
@@ -92,6 +93,9 @@ public class MethodCallNode {
 
     public String getReturnType() { return returnType; }
     public void setReturnType(String returnType) { this.returnType = returnType; }
+
+    public String getRealReturnType() { return realReturnType; }
+    public void setRealReturnType(String realReturnType) { this.realReturnType = realReturnType; }
 
     public String getReturnValue() { return returnValue; }
     public void setReturnValue(String returnValue) { this.returnValue = returnValue; }
@@ -153,6 +157,10 @@ public class MethodCallNode {
         if (returnType != null) {
             if (sb.length() > 1) sb.append(",");
             sb.append("\"returnType\":\"").append(escapeJson(returnType)).append("\"");
+        }
+        if (realReturnType != null && !realReturnType.isEmpty()) {
+            if (sb.length() > 1) sb.append(",");
+            sb.append("\"realReturnType\":\"").append(escapeJson(realReturnType)).append("\"");
         }
         if (returnValue != null) {
             if (sb.length() > 1) sb.append(",");
