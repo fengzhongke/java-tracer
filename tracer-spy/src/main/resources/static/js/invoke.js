@@ -1157,9 +1157,12 @@ function loadMembersForModal(className, loaderId) {
 
 function renderMemberList(members, className) {
     var searchedSimpleName = shortClassName(className);
+    var isFirstStep = msContext.action === 'addFirstStep';
     var methods = [];
     var fields = [];
     for (var i = 0; i < members.length; i++) {
+        // First step: only show static members (no receiver available)
+        if (isFirstStep && !members[i].isStatic) continue;
         if (members[i].isField) fields.push(members[i]);
         else methods.push(members[i]);
     }

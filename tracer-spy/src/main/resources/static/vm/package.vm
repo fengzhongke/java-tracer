@@ -4,16 +4,6 @@
     <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="/static/css/home.css?v=1.2" media="print">
-    <style>
-        .tree-node { cursor: pointer; }
-        .tree-node:hover { background-color: #f5f5f5; }
-        .tree-icon { margin-right: 5px; }
-        .tree-count { margin-left: 10px; font-weight: normal; }
-        .tree-woven { color: #5cb85c; }
-        .tree-notwoven { color: #d9534f; }
-        .tree-children { display: none; margin-left: 20px; }
-        .tree-children.expanded { display: block; }
-    </style>
 </head>
 
 <body>
@@ -29,6 +19,7 @@
                         <li><a href="/index">index</a></li>
                         <li><a href="/class">class</a></li>
                         <li class="active"><a href="/package">package</a></li>
+                        <li><a href="/invoke">invoke</a></li>
                         <li><a href="/unload">unload</a></li>
                     </ul>
                 </div>
@@ -67,7 +58,7 @@
                 <div class="col-md-3">
                     <div class="input-group">
                         <span class="input-group-addon">not woven:</span>
-                        <label class="form-control" id="total_notwoven" style="color:#d9534f">0</label>
+                        <label class="form-control" id="total_notwoven" style="color:#D9534F">0</label>
                     </div>
                 </div>
             </div>
@@ -90,77 +81,6 @@
     </div>
 </div>
 
-<script>
-function buildTree(node, level) {
-    var html = '<div class="tree-node" data-path="' + node.fullPath + '" style="padding: 5px 0;">';
-    var icon = node.children && node.children.length > 0 ? 'glyphicon-plus' : 'glyphicon-minus';
-    html += '<span class="glyphicon tree-icon ' + icon + '"></span>';
-    html += '<strong>' + node.name + '</strong>';
-    html += '<span class="tree-count tree-woven">woven: ' + node.totalWoven + '</span>';
-    html += '<span class="tree-count tree-notwoven">not woven: ' + node.totalNotWoven + '</span>';
-    html += '</div>';
-
-    if (node.children && node.children.length > 0) {
-        html += '<div class="tree-children" id="children_' + node.fullPath.replace(/[^a-zA-Z0-9]/g, '_') + '">';
-        for (var i = 0; i < node.children.length; i++) {
-            html += buildTree(node.children[i], level + 1);
-        }
-        html += '</div>';
-    }
-    return html;
-}
-
-function loadData() {
-    $.ajax({
-        url: '/package/get.json',
-        type: 'GET',
-        success: function(ret) {
-            if (ret.status) {
-                var data = ret.data;
-                $('#loader_count').text(data.loaderCount);
-                $('#total_classes').text(data.totalClasses);
-                $('#total_woven').text(data.totalWoven);
-                $('#total_notwoven').text(data.totalNotWoven);
-
-                var treeHtml = '';
-                if (data.packages && data.packages.length > 0) {
-                    for (var i = 0; i < data.packages.length; i++) {
-                        treeHtml += buildTree(data.packages[i], 0);
-                    }
-                } else {
-                    treeHtml = '<p class="text-muted">No packages found</p>';
-                }
-                $('#package_tree').html(treeHtml);
-
-                $('.tree-node').click(function() {
-                    var icon = $(this).find('.tree-icon');
-                    var childrenId = 'children_' + $(this).data('path').replace(/[^a-zA-Z0-9]/g, '_');
-                    var children = $('#' + childrenId);
-                    if (children.length) {
-                        if (children.hasClass('expanded')) {
-                            children.removeClass('expanded');
-                            icon.removeClass('glyphicon-minus').addClass('glyphicon-plus');
-                        } else {
-                            children.addClass('expanded');
-                            icon.removeClass('glyphicon-plus').addClass('glyphicon-minus');
-                        }
-                    }
-                });
-            } else {
-                $('#package_tree').html('<p class="text-danger">Error: ' + ret.msg + '</p>');
-            }
-        },
-        error: function() {
-            $('#package_tree').html('<p class="text-danger">Failed to load data</p>');
-        }
-    });
-}
-
-$('#refresh_btn').click(function() {
-    loadData();
-});
-
-loadData();
-</script>
+<script src="/static/js/package.js?v=1"></script>
 </body>
 </html>
