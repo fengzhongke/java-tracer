@@ -23,6 +23,7 @@
         .chain-step.step-field  { border-left: 3px solid #f0ad4e; }
         .chain-step.step-classref { border-left: 3px solid #31708f; }
         .chain-step.step-static { border-left: 3px solid #3c763d; }
+        .chain-step.step-arrayget { border-left: 3px solid #2e7d32; }
 
         /* Step number */
         .step-num {
@@ -48,6 +49,8 @@
         .type-badge.badge-static { background: #dff0d8; color: #3c763d; }
         .type-badge.badge-classref { background: #d9edf7; color: #31708f; cursor: pointer; }
         .type-badge.badge-classref:hover { background: #bde0f2; }
+        .type-badge.badge-arrayget { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 11px; }
+        .type-badge.badge-arrayget:hover { background: #c8e6c9; }
         .step-name { font-weight: bold; color: #31708f; font-size: 13px; }
 
         /* Step params (inline) */
@@ -159,6 +162,12 @@
         .member-section-header {
             font-weight: bold; padding: 4px 6px; margin-top: 4px;
             color: #666; border-bottom: 1px solid #ddd; font-size: 12px;
+        }
+
+        /* Inherited badge — shows "from ClassName" for parent/interface members */
+        .badge-inherited {
+            font-size: 10px; padding: 1px 4px; border-radius: 2px;
+            background: #e8e8e8; color: #777;
         }
 
         /* Peek indicator */

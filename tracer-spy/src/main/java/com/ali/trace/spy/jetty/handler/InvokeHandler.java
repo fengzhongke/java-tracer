@@ -100,51 +100,30 @@ public class InvokeHandler implements ITraceHttpHandler {
             List<MethodMetaVO> methodsList = new ArrayList<MethodMetaVO>();
             Set<String> seen = new HashSet<String>(); // deduplicate by signature
 
-            // Collect public methods (includes inherited)
-            for (Method m : clazz.getMethods()) {
-                String sig = buildSignature(m);
-                if (seen.contains(sig)) continue;
-                seen.add(sig);
 
-                // Skip Object's basic methods
-                if (m.getDeclaringClass() == Object.class && !m.getName().equals("getClass")) continue;
+            while (clazz != null) {
+                // Collect declared methods (includes private/protected, no inherited)
+                for (Method m : clazz.getDeclaredMethods()) {
+                    String sig = buildSignature(m);
+                    if (seen.contains(sig)) continue;
+                    seen.add(sig);
 
-                MethodMetaVO vo = new MethodMetaVO();
-                vo.setName(m.getName());
-                vo.setReturnType(m.getReturnType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+                    MethodMetaVO vo = new MethodMetaVO();
+                    vo.setName(m.getName());
+                    vo.setReturnType(m.getReturnType().getSimpleName());
+                    vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                    vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
 
-                Class<?>[] paramTypes = m.getParameterTypes();
-                String[] paramTypeNames = new String[paramTypes.length];
-                for (int i = 0; i < paramTypes.length; i++) {
-                    paramTypeNames[i] = paramTypes[i].getSimpleName();
+                    Class<?>[] paramTypes = m.getParameterTypes();
+                    String[] paramTypeNames = new String[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        paramTypeNames[i] = paramTypes[i].getSimpleName();
+                    }
+                    vo.setParamTypes(paramTypeNames);
+
+                    methodsList.add(vo);
                 }
-                vo.setParamTypes(paramTypeNames);
-
-                methodsList.add(vo);
-            }
-
-            // Collect declared methods (includes private/protected, no inherited)
-            for (Method m : clazz.getDeclaredMethods()) {
-                String sig = buildSignature(m);
-                if (seen.contains(sig)) continue;
-                seen.add(sig);
-
-                MethodMetaVO vo = new MethodMetaVO();
-                vo.setName(m.getName());
-                vo.setReturnType(m.getReturnType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
-
-                Class<?>[] paramTypes = m.getParameterTypes();
-                String[] paramTypeNames = new String[paramTypes.length];
-                for (int i = 0; i < paramTypes.length; i++) {
-                    paramTypeNames[i] = paramTypes[i].getSimpleName();
-                }
-                vo.setParamTypes(paramTypeNames);
-
-                methodsList.add(vo);
+                clazz = clazz.getSuperclass();
             }
 
             DataRet<List<MethodMetaVO>> ret = new DataRet<List<MethodMetaVO>>(true, 0, "ok");
@@ -253,15 +232,59 @@ public class InvokeHandler implements ITraceHttpHandler {
 
             List<MemberMetaVO> membersList = new ArrayList<MemberMetaVO>();
             Set<String> seen = new HashSet<String>(); // deduplicate by name+signature
+            Class<?> originalClazz = clazz;
 
-            // Collect public methods (includes inherited)
-            for (Method m : clazz.getMethods()) {
+            while (clazz != null) {
+                // Collect declared methods (includes private/protected, no inherited)
+                for (Method m : clazz.getDeclaredMethods()) {
+                    String sig = buildSignature(m);
+                    if (seen.contains(sig)) continue;
+                    seen.add(sig);
+
+                    MemberMetaVO vo = new MemberMetaVO();
+                    vo.setName(m.getName());
+                    vo.setReturnType(m.getReturnType().getSimpleName());
+                    vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                    vo.setField(false);
+                    vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+
+                    Class<?>[] paramTypes = m.getParameterTypes();
+                    String[] paramTypeNames = new String[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        paramTypeNames[i] = paramTypes[i].getSimpleName();
+                    }
+                    vo.setParamTypes(paramTypeNames);
+
+                    membersList.add(vo);
+                }
+
+                // Collect fields (declared fields — includes private/protected)
+                for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                    String fieldKey = "field:" + f.getName();
+                    if (seen.contains(fieldKey)) continue;
+                    seen.add(fieldKey);
+
+                    MemberMetaVO vo = new MemberMetaVO();
+                    vo.setName(f.getName());
+                    vo.setReturnType(f.getType().getSimpleName());
+                    vo.setStatic(Modifier.isStatic(f.getModifiers()));
+                    vo.setField(true);
+                    vo.setDeclaringClass(f.getDeclaringClass().getSimpleName());
+                    vo.setParamTypes(new String[0]); // fields have no params
+
+                    membersList.add(vo);
+                }
+                clazz = clazz.getSuperclass();
+            }
+
+            // Also include public methods from interfaces that the class implements.
+            // getMethods() returns all accessible public methods including inherited
+            // and interface methods — this covers interface default methods and methods
+            // from interfaces that the class doesn't override.
+            for (Method m : originalClazz.getMethods()) {
                 String sig = buildSignature(m);
                 if (seen.contains(sig)) continue;
                 seen.add(sig);
-
-                // Skip Object's basic methods except getClass
-                if (m.getDeclaringClass() == Object.class && !m.getName().equals("getClass")) continue;
 
                 MemberMetaVO vo = new MemberMetaVO();
                 vo.setName(m.getName());
@@ -276,63 +299,6 @@ public class InvokeHandler implements ITraceHttpHandler {
                     paramTypeNames[i] = paramTypes[i].getSimpleName();
                 }
                 vo.setParamTypes(paramTypeNames);
-
-                membersList.add(vo);
-            }
-
-            // Collect declared methods (includes private/protected, no inherited)
-            for (Method m : clazz.getDeclaredMethods()) {
-                String sig = buildSignature(m);
-                if (seen.contains(sig)) continue;
-                seen.add(sig);
-
-                MemberMetaVO vo = new MemberMetaVO();
-                vo.setName(m.getName());
-                vo.setReturnType(m.getReturnType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                vo.setField(false);
-                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
-
-                Class<?>[] paramTypes = m.getParameterTypes();
-                String[] paramTypeNames = new String[paramTypes.length];
-                for (int i = 0; i < paramTypes.length; i++) {
-                    paramTypeNames[i] = paramTypes[i].getSimpleName();
-                }
-                vo.setParamTypes(paramTypeNames);
-
-                membersList.add(vo);
-            }
-
-            // Collect fields (declared fields — includes private/protected)
-            for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
-                String fieldKey = "field:" + f.getName();
-                if (seen.contains(fieldKey)) continue;
-                seen.add(fieldKey);
-
-                MemberMetaVO vo = new MemberMetaVO();
-                vo.setName(f.getName());
-                vo.setReturnType(f.getType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(f.getModifiers()));
-                vo.setField(true);
-                vo.setDeclaringClass(f.getDeclaringClass().getSimpleName());
-                vo.setParamTypes(new String[0]); // fields have no params
-
-                membersList.add(vo);
-            }
-
-            // Collect inherited public fields
-            for (java.lang.reflect.Field f : clazz.getFields()) {
-                String fieldKey = "field:" + f.getName();
-                if (seen.contains(fieldKey)) continue;
-                seen.add(fieldKey);
-
-                MemberMetaVO vo = new MemberMetaVO();
-                vo.setName(f.getName());
-                vo.setReturnType(f.getType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(f.getModifiers()));
-                vo.setField(true);
-                vo.setDeclaringClass(f.getDeclaringClass().getSimpleName());
-                vo.setParamTypes(new String[0]);
 
                 membersList.add(vo);
             }

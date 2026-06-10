@@ -26,7 +26,10 @@ public class MethodCallNode {
     private String valueType;       // literal type (e.g. "int", "String", "null")
 
     // --- Call type field ---
-    private String callType;        // "method", "field", "classRef", "literal" (default "method")
+    private String callType;        // "method", "field", "classRef", "literal", "arrayGet" (default "method")
+
+    // --- Array/List index access field (used when callType is "arrayGet") ---
+    private int index = -1;         // array/list index (e.g. 0, 1, 2...); -1 means not set
 
     // --- Response fields (populated after invocation) ---
     private String returnType;      // return type simple name
@@ -49,6 +52,10 @@ public class MethodCallNode {
 
     public boolean isFieldAccess() {
         return "field".equals(callType) && methodName != null;
+    }
+
+    public boolean isArrayGet() {
+        return "arrayGet".equals(callType) && index >= 0;
     }
 
     public boolean isLiteral() {
@@ -104,6 +111,9 @@ public class MethodCallNode {
     public String getCallType() { return callType; }
     public void setCallType(String callType) { this.callType = callType; }
 
+    public int getIndex() { return index; }
+    public void setIndex(int index) { this.index = index; }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -156,6 +166,9 @@ public class MethodCallNode {
         sb.append(",\"duration\":").append(duration);
         if (loaderId > 0) {
             sb.append(",\"loaderId\":").append(loaderId);
+        }
+        if (index >= 0) {
+            sb.append(",\"index\":").append(index);
         }
 
         // Nested structures

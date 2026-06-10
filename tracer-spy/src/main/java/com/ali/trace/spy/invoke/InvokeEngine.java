@@ -10,7 +10,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Core recursive method invocation engine.
@@ -118,12 +120,20 @@ public class InvokeEngine {
 
             java.lang.reflect.Field field = findField(clazz, node.getMethodName());
             if (field == null) {
-                // Build available fields info for the error message
+                // Build available fields info for the error message — walk superclass chain
                 StringBuilder avail = new StringBuilder();
-                for (java.lang.reflect.Field f : clazz.getFields()) {
-                    avail.append(f.getName()).append("(").append(f.getType().getSimpleName()).append("); ");
+                Class<?> availCurrent = clazz;
+                while (availCurrent != null) {
+                    for (java.lang.reflect.Field f : availCurrent.getDeclaredFields()) {
+                        avail.append(f.getName()).append("(").append(f.getType().getSimpleName())
+                            .append(") [from ").append(availCurrent.getSimpleName()).append("]; ");
+                    }
+                    availCurrent = availCurrent.getSuperclass();
                 }
-                node.setException("field not found: " + node.getMethodName() + " in " + node.getClassName()
+                // Show runtime class name when className is empty
+                String classInfo = (node.getClassName() != null && !node.getClassName().isEmpty())
+                    ? node.getClassName() : clazz.getName();
+                node.setException("field not found: " + node.getMethodName() + " in " + classInfo
                     + (avail.length() > 0 ? " — available: " + avail.toString() : ""));
                 node.setDuration(0);
                 return node;
@@ -153,9 +163,105 @@ public class InvokeEngine {
             return node;
         }
 
+        // --- Array/List index access node ---
+        if (node.isArrayGet()) {
+            // Step 1: Evaluate target (the array or list object)
+            Object receiver = null;
+            if (node.getTarget() != null) {
+                invoke(node.getTarget(), depth + 1);
+                if (node.getTarget().getException() != null) {
+                    node.setException("target invocation failed: " + node.getTarget().getException());
+                    node.setDuration(0);
+                    return node;
+                }
+                receiver = node.getTarget().resolvedValue;
+            }
+            if (receiver == null) {
+                node.setException("cannot access index on null target");
+                node.setDuration(0);
+                return node;
+            }
+
+            int idx = node.getIndex();
+
+            // Step 2: Get value by index
+            long start = System.currentTimeMillis();
+            try {
+                Object result;
+                Class<?> componentType;
+
+                if (receiver.getClass().isArray()) {
+                    // Native array access
+                    result = java.lang.reflect.Array.get(receiver, idx);
+                    componentType = receiver.getClass().getComponentType();
+                } else if (receiver instanceof java.util.List) {
+                    // List access
+                    java.util.List<?> list = (java.util.List<?>) receiver;
+                    if (idx < 0 || idx >= list.size()) {
+                        long elapsed = System.currentTimeMillis() - start;
+                        node.setException("index out of bounds: " + idx + " (size=" + list.size() + ")");
+                        node.setDuration(elapsed);
+                        return node;
+                    }
+                    result = list.get(idx);
+                    // For List, returnType is the generic element type hint (Object if unknown)
+                    componentType = Object.class; // List.get() returns Object
+                    // Try to get a more specific type from the field/method that returned this list
+                    String targetReturnHint = node.getTarget().getReturnType();
+                    if (targetReturnHint != null && !targetReturnHint.isEmpty()
+                        && targetReturnHint.endsWith("[]")) {
+                        // e.g. "String[]" → element type is "String"
+                        componentType = null; // will use targetReturnHint for display below
+                    }
+                } else {
+                    long elapsed = System.currentTimeMillis() - start;
+                    node.setException("target is not an array or List: " + receiver.getClass().getName());
+                    node.setDuration(elapsed);
+                    return node;
+                }
+
+                long elapsed = System.currentTimeMillis() - start;
+                node.resolvedValue = result;
+
+                // Determine return type for display
+                if (result != null) {
+                    node.setReturnType(result.getClass().getSimpleName());
+                } else if (componentType != null) {
+                    node.setReturnType(componentType.getSimpleName());
+                } else {
+                    // For List with generic type hint from target
+                    String targetReturnHint = node.getTarget().getReturnType();
+                    if (targetReturnHint != null && targetReturnHint.endsWith("[]")) {
+                        node.setReturnType(targetReturnHint.substring(0, targetReturnHint.length() - 2));
+                    } else {
+                        node.setReturnType("Object");
+                    }
+                }
+
+                node.setReturnValue(formatResult(result));
+                node.setVoid(false);
+                node.setDuration(elapsed);
+                node.setException(null);
+
+            } catch (ArrayIndexOutOfBoundsException e) {
+                long elapsed = System.currentTimeMillis() - start;
+                int arrayLen = receiver.getClass().isArray() ? java.lang.reflect.Array.getLength(receiver) : -1;
+                node.setException("index out of bounds: " + idx + " (length=" + arrayLen + ")");
+                node.setDuration(elapsed);
+                node.resolvedValue = null;
+            } catch (Throwable e) {
+                long elapsed = System.currentTimeMillis() - start;
+                node.setException(e.getClass().getName() + ": " + e.getMessage());
+                node.setDuration(elapsed);
+                node.resolvedValue = null;
+            }
+
+            return node;
+        }
+
         // --- Method call node ---
         if (!node.isMethodCall()) {
-            node.setException("invalid node: neither method call, field access, class reference, nor literal");
+            node.setException("invalid node: neither method call, field access, array/list access, class reference, nor literal");
             node.setDuration(0);
             return node;
         }
@@ -211,19 +317,43 @@ public class InvokeEngine {
         Method method = resolveMethod(clazz, node.getMethodName(), node.getParamTypes(), args);
         if (method == null) {
             // Build available methods info for the error message
+            // Walk the entire class hierarchy to show all available methods with this name
             StringBuilder avail = new StringBuilder();
-            for (Method m : clazz.getMethods()) {
-                if (m.getName().equals(node.getMethodName())) {
-                    avail.append(m.getName()).append("(");
-                    Class<?>[] pts = m.getParameterTypes();
-                    for (int i = 0; i < pts.length; i++) {
-                        avail.append(pts[i].getSimpleName());
-                        if (i < pts.length - 1) avail.append(",");
+            Class<?> availCurrent = clazz;
+            while (availCurrent != null) {
+                for (Method m : availCurrent.getDeclaredMethods()) {
+                    if (m.getName().equals(node.getMethodName())) {
+                        avail.append(m.getName()).append("(");
+                        Class<?>[] pts = m.getParameterTypes();
+                        for (int i = 0; i < pts.length; i++) {
+                            avail.append(pts[i].getSimpleName());
+                            if (i < pts.length - 1) avail.append(",");
+                        }
+                        avail.append(")").append(Modifier.isStatic(m.getModifiers()) ? " [static]" : "")
+                            .append(" [from ").append(availCurrent.getSimpleName()).append("]; ");
                     }
-                    avail.append(")").append(Modifier.isStatic(m.getModifiers()) ? " [static]" : "").append("; ");
+                }
+                availCurrent = availCurrent.getSuperclass();
+            }
+            // Also check interfaces
+            for (Class<?> iface : getAllInterfaces(clazz)) {
+                for (Method m : iface.getDeclaredMethods()) {
+                    if (m.getName().equals(node.getMethodName())) {
+                        avail.append(m.getName()).append("(");
+                        Class<?>[] pts = m.getParameterTypes();
+                        for (int i = 0; i < pts.length; i++) {
+                            avail.append(pts[i].getSimpleName());
+                            if (i < pts.length - 1) avail.append(",");
+                        }
+                        avail.append(")").append(Modifier.isStatic(m.getModifiers()) ? " [static]" : "")
+                            .append(" [from ").append(iface.getSimpleName()).append("]; ");
+                    }
                 }
             }
-            node.setException("method not found: " + node.getMethodName() + " in " + node.getClassName()
+            // Show runtime class name when className is empty
+            String classInfo = (node.getClassName() != null && !node.getClassName().isEmpty())
+                ? node.getClassName() : clazz.getName();
+            node.setException("method not found: " + node.getMethodName() + " in " + classInfo
                 + (avail.length() > 0 ? " — available: " + avail.toString() : ""));
             node.setDuration(0);
             return node;
@@ -377,29 +507,39 @@ public class InvokeEngine {
     // =============================================
 
     /**
-     * Resolve a method by name with 3-tier fallback strategy:
+     * Resolve a method by name with 5-tier fallback strategy:
      * 1. Exact resolution (when paramTypes is provided)
      * 2. Runtime type matching (when paramTypes is not provided, use evaluated args types)
-     * 3. Name + parameter count fallback
+     * 3. Name + parameter count fallback (public methods via getMethods)
+     * 4. Superclass chain walk (declared methods including protected/package-private)
+     * 5. Interface hierarchy walk (interface declared methods including default)
      */
     private Method resolveMethod(Class<?> clazz, String methodName, String[] paramTypes, Object[] args) {
         // Strategy 1: Exact resolution with paramTypes
         if (paramTypes != null && paramTypes.length > 0) {
             Class<?>[] resolvedParamTypes = new Class<?>[paramTypes.length];
+            boolean allResolved = true;
             for (int i = 0; i < paramTypes.length; i++) {
                 Class<?> pc = resolveParamClass(paramTypes[i]);
                 if (pc == null) {
-                    break; // Can't resolve param type, fall through to strategy 2
+                    allResolved = false;
+                    break;
                 }
                 resolvedParamTypes[i] = pc;
             }
 
-            // Try getDeclaredMethod first (includes private/protected)
-            try {
-                Method m = clazz.getDeclaredMethod(methodName, resolvedParamTypes);
-                return m;
-            } catch (NoSuchMethodException e) {
-                // Try getMethod (public only)
+            if (allResolved) {
+                // Try exact match on the class and its superclass chain
+                Class<?> current = clazz;
+                while (current != null) {
+                    try {
+                        return current.getDeclaredMethod(methodName, resolvedParamTypes);
+                    } catch (NoSuchMethodException e) {
+                        // Not in this class, try next superclass
+                    }
+                    current = current.getSuperclass();
+                }
+                // Try getMethod (public only, includes inherited)
                 try {
                     return clazz.getMethod(methodName, resolvedParamTypes);
                 } catch (NoSuchMethodException e2) {
@@ -422,26 +562,30 @@ public class InvokeEngine {
         }
 
         if (!hasNullArg) {
-            // Search all methods with matching name
-            for (Method m : clazz.getDeclaredMethods()) {
-                if (!m.getName().equals(methodName)) continue;
-                Class<?>[] mParamTypes = m.getParameterTypes();
-                if (mParamTypes.length != args.length) continue;
+            // Search declared methods in the class and its superclass chain
+            Class<?> current = clazz;
+            while (current != null) {
+                for (Method m : current.getDeclaredMethods()) {
+                    if (!m.getName().equals(methodName)) continue;
+                    Class<?>[] mParamTypes = m.getParameterTypes();
+                    if (mParamTypes.length != args.length) continue;
 
-                boolean allCompatible = true;
-                for (int i = 0; i < mParamTypes.length; i++) {
-                    if (!isTypeCompatible(mParamTypes[i], runtimeTypes[i])) {
-                        allCompatible = false;
-                        break;
+                    boolean allCompatible = true;
+                    for (int i = 0; i < mParamTypes.length; i++) {
+                        if (!isTypeCompatible(mParamTypes[i], runtimeTypes[i])) {
+                            allCompatible = false;
+                            break;
+                        }
+                    }
+                    if (allCompatible) {
+                        return m;
                     }
                 }
-                if (allCompatible) {
-                    return m;
-                }
+                current = current.getSuperclass();
             }
         }
 
-        // Strategy 3: Name + parameter count fallback
+        // Strategy 3: Name + parameter count fallback (public methods via getMethods)
         Method bestMatch = null;
         for (Method m : clazz.getMethods()) {
             if (!m.getName().equals(methodName)) continue;
@@ -455,8 +599,78 @@ public class InvokeEngine {
                 bestMatch = m;
             }
         }
+        if (bestMatch != null) return bestMatch;
 
-        return bestMatch;
+        // Strategy 4: Superclass chain walk — find declared methods including protected/package-private
+        // (covers methods not visible via getMethods() — e.g. protected methods in superclasses)
+        Class<?> current = clazz.getSuperclass();
+        while (current != null && current != Object.class) {
+            for (Method m : current.getDeclaredMethods()) {
+                if (!m.getName().equals(methodName)) continue;
+                if (m.getParameterTypes().length != args.length) continue;
+                // Skip static methods for instance call chains
+                if (Modifier.isStatic(m.getModifiers())) continue;
+
+                if (args.length == 0) return m;  // No-arg method, direct match
+                // Check type compatibility for methods with parameters
+                boolean allCompatible = true;
+                for (int i = 0; i < m.getParameterTypes().length; i++) {
+                    if (hasNullArg && runtimeTypes[i] == null) continue;  // null arg is compatible with any type
+                    if (!hasNullArg && !isTypeCompatible(m.getParameterTypes()[i], runtimeTypes[i])) {
+                        allCompatible = false;
+                        break;
+                    }
+                }
+                if (allCompatible) return m;
+            }
+            current = current.getSuperclass();
+        }
+
+        // Strategy 5: Interface hierarchy walk — find methods declared in interfaces
+        // (covers interface default methods and abstract methods not found via getMethods)
+        Set<Class<?>> allInterfaces = getAllInterfaces(clazz);
+        for (Class<?> iface : allInterfaces) {
+            for (Method m : iface.getDeclaredMethods()) {
+                if (!m.getName().equals(methodName)) continue;
+                if (m.getParameterTypes().length != args.length) continue;
+                if (Modifier.isStatic(m.getModifiers())) continue;
+
+                if (args.length == 0) return m;
+                boolean allCompatible = true;
+                for (int i = 0; i < m.getParameterTypes().length; i++) {
+                    if (hasNullArg && runtimeTypes[i] == null) continue;
+                    if (!hasNullArg && !isTypeCompatible(m.getParameterTypes()[i], runtimeTypes[i])) {
+                        allCompatible = false;
+                        break;
+                    }
+                }
+                if (allCompatible) return m;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Collect all interfaces that a class implements (including inherited interfaces from superclasses).
+     */
+    private Set<Class<?>> getAllInterfaces(Class<?> clazz) {
+        Set<Class<?>> interfaces = new HashSet<Class<?>>();
+        Class<?> current = clazz;
+        while (current != null) {
+            collectInterfaces(current, interfaces);
+            current = current.getSuperclass();
+        }
+        return interfaces;
+    }
+
+    private void collectInterfaces(Class<?> clazz, Set<Class<?>> collected) {
+        for (Class<?> iface : clazz.getInterfaces()) {
+            if (!collected.contains(iface)) {
+                collected.add(iface);
+                collectInterfaces(iface, collected);  // Recurse for super-interfaces
+            }
+        }
     }
 
     /**

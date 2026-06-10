@@ -53,6 +53,25 @@ function createFieldStep(className, fieldName, isStatic, loaderId) {
     };
 }
 
+function createArrayGetStep(index, loaderId) {
+    return {
+        callType: 'arrayGet',
+        className: '',
+        methodName: '',
+        index: index || 0,
+        paramTypes: '',
+        params: [],
+        isStatic: false,
+        loaderId: loaderId || 0,
+        returnType: '',
+        returnValue: '',
+        isVoid: false,
+        exception: null,
+        duration: 0,
+        _returnTypeHint: ''
+    };
+}
+
 function createClassRefStep(className, loaderId) {
     return {
         callType: 'classRef',
@@ -163,6 +182,23 @@ function canChainFrom(typeName) {
     if (!typeName) return false;
     var noChain = ['void','boolean','byte','short','int','long','float','double','char','String'];
     return noChain.indexOf(typeName) < 0;
+}
+
+function isArrayOrListType(typeName) {
+    if (!typeName) return false;
+    return typeName.endsWith('[]') || typeName === 'List' || typeName === 'ArrayList' ||
+        typeName === 'Collection' || typeName === 'Set' || typeName === 'Map' ||
+        typeName.startsWith('List<') || typeName.startsWith('Collection<') ||
+        typeName.startsWith('Set<');
+}
+
+/** Get the element type from an array type name.
+ *  "String[]" → "String", "int[]" → "int", "Object[]" → "Object"
+ */
+function elementTypeName(typeName) {
+    if (!typeName) return 'Object';
+    if (typeName.endsWith('[]')) return typeName.substring(0, typeName.length - 2);
+    return 'Object';  // List/Collection types → element is Object (runtime resolves)
 }
 
 function canUseSubchain(typeName) {
@@ -396,6 +432,7 @@ function renderStep(step, index, parentPathPrefix) {
     var cssClass = 'chain-step';
     if (step.callType === 'field') cssClass += ' step-field';
     else if (step.callType === 'classRef') cssClass += ' step-classref';
+    else if (step.callType === 'arrayGet') cssClass += ' step-arrayget';
     else if (step.isStatic) cssClass += ' step-static';
     else cssClass += ' step-method';
 
@@ -417,6 +454,8 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">Class</button>';
+        } else if (step.callType === 'arrayGet') {
+            html += '<button class="type-badge badge-arrayget" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">[' + step.index + ']</button>';
         } else {
             html += '<button class="type-badge badge-method" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">method</button>';
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
@@ -428,6 +467,8 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">Class</button>';
+        } else if (step.callType === 'arrayGet') {
+            html += '<button class="type-badge badge-arrayget" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">[' + step.index + ']</button>';
         } else {
             html += '<button class="type-badge badge-method" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">method</button>';
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
@@ -436,6 +477,8 @@ function renderStep(step, index, parentPathPrefix) {
     html += '<span class="step-name">';
     if (step.callType === 'classRef') {
         html += escapeHtml(shortClassName(step.className)) + '.class';
+    } else if (step.callType === 'arrayGet') {
+        html += '[' + step.index + ']';
     } else if (step.className) {
         html += escapeHtml(shortClassName(step.className)) + '.' + escapeHtml(step.methodName || '');
     } else {
@@ -485,6 +528,10 @@ function renderStep(step, index, parentPathPrefix) {
         var stepsArr = chainSteps;
         if (stepsArr && index === stepsArr.length - 1) {
             var retHint = step._returnTypeHint || step.returnType || '';
+            // Show [i] button when return type is array or List
+            if (isArrayOrListType(retHint)) {
+                html += '<button class="btn btn-success btn-xs" onclick="addArrayGetStep()"><span class="glyphicon glyphicon-th-list"></span> [i]</button>';
+            }
             if (canChainFrom(retHint)) {
                 html += '<button class="btn btn-primary btn-xs" onclick="addNextStep()"><span class="glyphicon glyphicon-plus"></span> Next Step</button>';
             }
@@ -493,6 +540,10 @@ function renderStep(step, index, parentPathPrefix) {
         var subStepsArr = getSubStepsByPathPrefix(parentPathPrefix);
         if (subStepsArr && index === subStepsArr.length - 1) {
             var retHint = step._returnTypeHint || step.returnType || '';
+            // Show [i] button when return type is array or List
+            if (isArrayOrListType(retHint)) {
+                html += '<button class="btn btn-success btn-xs" onclick="addArrayGetSubStep(\'' + parentPathPrefix + '\')"><span class="glyphicon glyphicon-th-list"></span> [i]</button>';
+            }
             if (canChainFrom(retHint)) {
                 html += '<button class="btn btn-primary btn-xs" onclick="addNextSubStep(\'' + parentPathPrefix + '\')"><span class="glyphicon glyphicon-plus"></span> Next</button>';
             }
@@ -632,6 +683,67 @@ function addNextStep() {
     } else {
         invokeForPeek();
     }
+}
+
+function addArrayGetStep() {
+    if (chainSteps.length === 0) {
+        alert('Add at least one step first');
+        return;
+    }
+    var lastStep = chainSteps[chainSteps.length - 1];
+    var retHint = lastStep._returnTypeHint || lastStep.returnType || '';
+
+    // If return type is unknown, invoke first to discover the actual type
+    if (!retHint || retHint === 'Object' || !isArrayOrListType(retHint)) {
+        msContext = { action: 'addNextStepAfterPeek' };
+        invokeForPeek();
+        // After peek, if the actual type turns out to be array/list, add arrayGet step
+        // This is handled in the peek success callback below
+        return;
+    }
+
+    var indexStr = prompt('Enter array/list index (0, 1, 2, ...):');
+    if (indexStr === null || indexStr === '') return;  // user cancelled
+    var idx = parseInt(indexStr);
+    if (isNaN(idx) || idx < 0) { alert('Invalid index, must be a non-negative integer'); return; }
+
+    var newNode = createArrayGetStep(idx);
+    newNode._returnTypeHint = elementTypeName(retHint);
+    newNode.className = '';  // resolved from target runtime type
+    newNode.isStatic = false;
+    chainSteps.push(newNode);
+    clearAllResults();
+    renderChain();
+}
+
+function addArrayGetSubStep(pathPrefix) {
+    var subSteps = getSubStepsByPathPrefix(pathPrefix);
+    if (!subSteps || subSteps.length === 0) {
+        alert('Add at least one sub-step first');
+        return;
+    }
+    var lastSub = subSteps[subSteps.length - 1];
+    var retHint = lastSub._returnTypeHint || lastSub.returnType || '';
+
+    if (!retHint || !isArrayOrListType(retHint)) {
+        msContext = { action: 'addNextSubStepAfterPeek', pathStr: pathPrefix };
+        invokeForPeekSub(pathPrefix);
+        return;
+    }
+
+    var indexStr = prompt('Enter array/list index (0, 1, 2, ...):');
+    if (indexStr === null || indexStr === '') return;
+    var idx = parseInt(indexStr);
+    if (isNaN(idx) || idx < 0) { alert('Invalid index, must be a non-negative integer'); return; }
+
+    var newNode = createArrayGetStep(idx);
+    newNode._returnTypeHint = elementTypeName(retHint);
+    newNode.className = '';
+    newNode.isStatic = false;
+    subSteps.push(newNode);
+    expandedEditors[pathPrefix] = true;
+    clearAllResults();
+    renderChain();
 }
 
 /**
@@ -867,7 +979,13 @@ function invokeForPeekSub(pathPrefix) {
 }
 
 function autoSearchByReturnType(returnType) {
-    $.post('/invoke/classes.json', {prefix: returnType}, function(str) {
+    // If the return type is an array, strip "[]" and search for the element type
+    var searchType = returnType;
+    if (searchType.endsWith('[]')) {
+        searchType = searchType.substring(0, searchType.length - 2);
+    }
+
+    $.post('/invoke/classes.json', {prefix: searchType}, function(str) {
         var ret;
         try { ret = JSON.parse(str); } catch(e) {
             showMemberSelector();
@@ -979,6 +1097,7 @@ function loadMembersForModal(className, loaderId) {
 }
 
 function renderMemberList(members, className) {
+    var searchedSimpleName = shortClassName(className);
     var methods = [];
     var fields = [];
     for (var i = 0; i < members.length; i++) {
@@ -1002,7 +1121,7 @@ function renderMemberList(members, className) {
             var group = methodGroups[methodOrder[g]];
             var baseMethod = group[0];
             if (group.length === 1) {
-                html += renderSingleMethod(baseMethod, className);
+                html += renderSingleMethod(baseMethod, className, false, searchedSimpleName);
             } else {
                 html += '<div style="margin:2px 0;">';
                 html += '<div style="font-weight:bold;padding:3px 6px;color:#31708f;font-size:13px;">';
@@ -1014,7 +1133,7 @@ function renderMemberList(members, className) {
                     return (a.paramTypes ? a.paramTypes.length : 0) - (b.paramTypes ? b.paramTypes.length : 0);
                 });
                 for (var s = 0; s < sorted.length; s++) {
-                    html += renderSingleMethod(sorted[s], className, true);
+                    html += renderSingleMethod(sorted[s], className, true, searchedSimpleName);
                 }
                 html += '</div>';
             }
@@ -1027,11 +1146,15 @@ function renderMemberList(members, className) {
             var f = fields[i];
             var info = JSON.stringify({
                 className: className, name: f.name, returnType: f.returnType,
-                isStatic: f.isStatic, isField: true, loaderId: msContext.currentLoaderId || 0
+                isStatic: f.isStatic, isField: true, declaringClass: f.declaringClass || '',
+                loaderId: msContext.currentLoaderId || 0
             });
             html += '<div class="member-item field-item" onclick="msSelectMember(this)" data-member-info="' + escapeAttr(info) + '">';
             html += '<div><span class="member-name">' + escapeHtml(f.name) + '</span>';
             if (f.isStatic) html += ' <span class="type-badge badge-static">static</span>';
+            if (f.declaringClass && f.declaringClass !== searchedSimpleName) {
+                html += ' <span class="badge-inherited">from ' + escapeHtml(f.declaringClass) + '</span>';
+            }
             html += '</div>';
             html += '<div class="member-sig">' + escapeHtml(f.returnType) + '</div>';
             html += '</div>';
@@ -1047,10 +1170,11 @@ function renderMemberList(members, className) {
     $('#ms_member_list').html(html);
 }
 
-function renderSingleMethod(m, className, isOverload) {
+function renderSingleMethod(m, className, isOverload, searchedSimpleName) {
     var info = JSON.stringify({
         className: className, name: m.name, returnType: m.returnType,
         paramTypes: m.paramTypes || [], isStatic: m.isStatic, isField: false,
+        declaringClass: m.declaringClass || '',
         loaderId: msContext.currentLoaderId || 0
     });
     var indent = isOverload ? ' style="padding-left:16px;"' : '';
@@ -1062,6 +1186,9 @@ function renderSingleMethod(m, className, isOverload) {
         html += '()';
     }
     html += '</span>';
+    if (m.declaringClass && m.declaringClass !== searchedSimpleName) {
+        html += ' <span class="badge-inherited">from ' + escapeHtml(m.declaringClass) + '</span>';
+    }
     if (!isOverload && m.isStatic) html += ' <span class="type-badge badge-static">static</span>';
     html += '</div>';
     html += '<div class="member-sig">' + escapeHtml(m.returnType) + '</div>';
@@ -1296,6 +1423,7 @@ function cloneStepForSerialization(step) {
     node.callType = step.callType || 'method';
     node.className = step.className || '';
     if (step.methodName) node.methodName = step.methodName;
+    if (step.index >= 0) node.index = step.index;
     var pt = normalizeParamTypes(step.paramTypes);
     if (pt && pt.trim()) {
         node.paramTypes = pt.split(',').map(function(s) { return s.trim(); });

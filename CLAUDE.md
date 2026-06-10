@@ -40,7 +40,7 @@ java -jar java-tracer.jar -pid=12345:-port=18902
 java -jar java-tracer.jar -pid=12345:-port=18902:-reload=true
 ```
 
-Agent arguments: `-port` (18902), `-sleep` (1ms transformer delay), `-mode` (0/1/2), `-reload` (force new ClassLoader), `-retransform` (retransform all loaded classes), `-pid` (target PID for attach).
+Agent arguments: `-port` (18902), `-sleep` (1ms transformer delay), `-mode` (0/1/2), `-reload` (force new ClassLoader), `-retransform` (retransform all loaded classes), `-pid` (target PID for attach), `-jdklib` (override JDK version for native lib extraction: `8` or `21`, auto-detected by default).
 
 ## Architecture
 
@@ -116,6 +116,17 @@ When `-reload=true` in agentmain:
 4. Update `AgentResVmLoader.updateClassLoader(newLoader)` and `VmViewResolver.reinit()` for Velocity template loading.
 5. Replace static `LOADER` and `INJECT` references. Old classloader and all its loaded classes become unreachable (JVM cannot truly unload them, but they're dead).
 
+### InvokeEngine — Recursive Method Invocation
+
+`InvokeEngine` (singleton) traverses a `MethodCallNode` call tree depth-first, evaluating inner calls first, then using resolved values as parameters for outer calls. It invokes methods via reflection across classloader boundaries. Key behaviors:
+
+- **Node types**: `method` (default), `field` (field read), `classRef` (Class.forName lookup, className-only node), `literal` (typed string-to-Object conversion)
+- **Class resolution**: 5-tier fallback — specified ClassLoader (loaderId) → all LoaderSets → Instrumentation.getAllLoadedClasses() → Class.forName(context CL) → Class.forName(default). When className is empty and a target receiver exists, uses the receiver's runtime type.
+- **Method resolution**: 3-tier fallback — exact match with paramTypes → runtime type matching with primitive/wrapper compatibility → name + parameter count (prefers public methods)
+- **Field resolution**: 4-tier lookup — getDeclaredField → getField → getFields scan → superclass chain scan of declared fields
+- **Safety limits**: `MAX_DEPTH=20` recursion guard, `MAX_VALUE_LEN=200` truncation on return values
+- `MethodCallNode` carries request fields (className, methodName, paramTypes, target, params, value, valueType, callType, loaderId) and response fields (returnType, returnValue, isVoid, exception, duration). The transient `resolvedValue` field holds the actual Java Object for parent nodes to use as param/receiver — not serialized.
+
 ### Web Handler Routing
 
 `HandlerConfig` scans handler classes for `@TracerPath`-annotated methods (defined in `ITraceHttpHandler`), creating `Module` entries sorted by order → path length → path specificity. `ModuleHttpServlet.doMethod()` matches request path against Module regex patterns.
@@ -148,6 +159,11 @@ Parameter injection: `HttpServletRequest`/`HttpServletResponse`/`PrintWriter` in
 | ThreadHandler | `/thread/get.xml` | Thread stack info as XML |
 | PackageHandler | `/package` | Package statistics view |
 | PackageHandler | `/package/get.json` | Package woven stats JSON |
+| InvokeHandler | `/invoke` | Method invocation page (Velocity template) |
+| InvokeHandler | `/invoke/exec` | Execute method invocation (POST, JSON body with MethodCallNode tree) |
+| InvokeHandler | `/invoke/methods.json` | List methods for a class (className param) |
+| InvokeHandler | `/invoke/classes.json` | Search loaded classes by prefix (prefix param, max 100 results) |
+| InvokeHandler | `/invoke/members.json` | List methods + fields for a class (className param) |
 | StaticHandler | `/static/(js|css)/.*` | Serve static JS/CSS resources |
 | UnloadHandler | `/unload` | Agent unload confirmation page |
 | UnloadHandler | `/unload/exec` | Detach the agent from the JVM |
@@ -172,7 +188,8 @@ Prefix matching (`startsWith`). Exclude checked first, then include. Default wit
 - Velocity templates in `tracer-spy/src/main/resources/static/vm/`; static JS/CSS in `static/js/`, `static/css/`
 - Trace visualization uses Raphael.js + sequence-diagram-min.js for rendering call sequences as interactive sequence diagrams
 - `SpyClassLoader` uses custom `bytes:///` URL scheme with inner `ByteURLConnection` to serve classloader resources (needed for Velocity template and static resource loading)
-- `shouldSkipClass()` filters out `java.*`, `javax.*`, `sun.*`, `$Proxy`, `$Hibernate`, `$SpringCGLIB`, `$$Lambda`, `$aux` during retransform
+- `shouldSkipClass()` filters out `java.*`, `javax.*`, `sun.*`, `com.sun.*`, `$Proxy`, `$Hibernate`, `$SpringCGLIB`, `$FastClass`, `$$Lambda`, `$aux` during retransform
 - `CommonThreadntercepter` class name contains a typo (missing 'o' in Interceptor) — do not "fix" this, it would break the class name reference in ConfigPool's interceptor selection
 - Dynamic attach uses bundled Attach API (`com.sun.tools.attach`) classes + native libs (`attach.dll`/`libattach.so` extracted at runtime) so no `tools.jar` dependency needed
+- On JDK 9+, `Premain.main()` re-executes itself with `--add-modules jdk.attach` and multiple `--add-opens` flags (guarded by `tracer.attach.reexeced=true` system property to prevent infinite re-execution). It checks for `jdk.attach` module availability via `ModuleLayer.boot()`. If the JDK's built-in Attach API fails (ClassNotFoundException or InvocationTargetException), falls back to bundled `jre08_tool.jar`/`jre21_tool.jar` extracted to disk
 - `XmlNode` (abstract, in `tracer-spy/spy/xml/`) provides XML rendering base for `ThreadHandler` and `ClassHandler` ad-hoc output (thread stacks, class loader trees)

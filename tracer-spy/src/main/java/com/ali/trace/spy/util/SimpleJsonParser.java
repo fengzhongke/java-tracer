@@ -100,6 +100,12 @@ public class SimpleJsonParser {
             node.setLoaderId(loaderId);
         }
 
+        // Extract index (for arrayGet nodes, -1 means not set)
+        int index = extractIntValue(content, "index");
+        if (index >= 0) {
+            node.setIndex(index);
+        }
+
         // Extract callType (optional, default "method")
         String callType = extractStringValue(content, "callType");
         if (callType != null && !callType.isEmpty()) {
