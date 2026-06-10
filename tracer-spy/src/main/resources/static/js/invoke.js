@@ -126,6 +126,23 @@ function truncate(s, max) {
     return s.length <= max ? s : s.substring(0, max) + '...';
 }
 
+/** Check if an exception message is a cascade (target invocation failed) rather than a root cause. */
+function isCascadeException(exception) {
+    return exception && exception.indexOf('target invocation failed:') === 0;
+}
+
+/** Extract the root cause from a cascade exception chain.
+ *  "target invocation failed: target invocation failed: class not found" → "class not found"
+ *  Returns the deepest non-cascade error message. */
+function extractRootCause(exception) {
+    if (!exception) return '';
+    var msg = exception;
+    while (msg.indexOf('target invocation failed:') === 0) {
+        msg = msg.substring('target invocation failed:'.length).trim();
+    }
+    return msg;
+}
+
 function escapeHtml(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -181,10 +198,10 @@ function getParamTypeHint(step, paramIndex) {
 }
 
 /** Clear all result data from steps and sub-chains (returnType, returnValue, exception, duration).
- *  Called whenever the chain structure changes so stale errors don't mislead the user. */
+ *  Called whenever the chain structure changes so stale errors don't mislead the user,
+ *  and before each invocation to reset the display state. */
 function clearAllResults() {
     clearStepsResults(chainSteps);
-    $('#invoke_result').hide();
 }
 
 function clearStepsResults(steps) {
@@ -426,9 +443,13 @@ function renderStep(step, index, parentPathPrefix) {
     }
     // Inline result after the name on the same line
     if (step.exception) {
-        html += ' <span class="ret-error">? ' + escapeHtml(truncate(step.exception, 80)) + '</span>';
+        if (isCascadeException(step.exception)) {
+            html += ' <span class="ret-cascade">=> cascade: ' + escapeHtml(truncate(extractRootCause(step.exception), 60)) + '</span>';
+        } else {
+            html += ' <span class="ret-error">=> ' + escapeHtml(truncate(step.exception, 80)) + '</span>';
+        }
     } else if (step.returnType || step.returnValue) {
-        html += ' ? <span class="ret-type">' + escapeHtml(step.returnType) + '</span>';
+        html += ' => <span class="ret-type">' + escapeHtml(step.returnType) + '</span>';
         if (step.returnValue) html += ': <span class="ret-value">' + escapeHtml(truncate(step.returnValue, 80)) + '</span>';
         if (step.duration > 0) html += ' <span class="ret-duration">(' + step.duration + 'ms)</span>';
     }
@@ -756,7 +777,7 @@ function invokeForPeek() {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data);
+                updateResultsFromTree(ret.data, chainSteps.length);
                 renderChain();
 
                 var lastStep = chainSteps[chainSteps.length - 1];
@@ -810,7 +831,7 @@ function invokeForPeekSub(pathPrefix) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data);
+                updateResultsFromTree(ret.data, chainSteps.length);
                 renderChain();
 
                 var lastSub = subSteps[subSteps.length - 1];
@@ -1132,6 +1153,9 @@ function invokeChainUpTo(stepIndex) {
     if (chainSteps.length === 0 || stepIndex < 0) { alert('Add at least one step first'); return; }
     var upTo = Math.min(stepIndex, chainSteps.length - 1);
 
+    // Clear all previous results before invoking to avoid stale data
+    clearAllResults();
+
     var json = serializeStepsRange(chainSteps, 0, upTo + 1);
     $.ajax({
         url: '/invoke/exec',
@@ -1142,7 +1166,7 @@ function invokeChainUpTo(stepIndex) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data);
+                updateResultsFromTree(ret.data, upTo + 1);
                 renderChain();
                 showChainResult();
             } else {
@@ -1207,7 +1231,17 @@ function showChainResult() {
     for (var i = 0; i < chainSteps.length; i++) {
         var step = chainSteps[i];
         var hasError = step.exception && step.exception.length > 0;
-        var cls = hasError ? 'result-step result-error' : 'result-step';
+        var isCascade = isCascadeException(step.exception);
+
+        // Three visual states: success (green), cascade (yellow/gray), root-cause failure (red)
+        var cls;
+        if (!hasError) {
+            cls = 'result-step';
+        } else if (isCascade) {
+            cls = 'result-step result-cascade';
+        } else {
+            cls = 'result-step result-error';
+        }
 
         html += '<div class="' + cls + '">';
         if (i > 0) html += '<span style="color:#5bc0de;">? </span>';
@@ -1215,9 +1249,14 @@ function showChainResult() {
         html += '<span class="result-sig">' + escapeHtml(step.methodName || shortClassName(step.className)) + '</span>';
 
         if (hasError) {
-            html += ' <span class="result-value-error">FAILED: ' + escapeHtml(truncate(step.exception, 60)) + '</span>';
+            if (isCascade) {
+                html += ' <span class="result-value-cascade">CASCADE: ' + escapeHtml(truncate(extractRootCause(step.exception), 60)) + '</span>';
+                html += '<span class="result-meta">(blocked by upstream failure)</span>';
+            } else {
+                html += ' <span class="result-value-error">FAILED: ' + escapeHtml(truncate(step.exception, 60)) + '</span>';
+            }
         } else {
-            html += ' <span class="result-value">? ' + escapeHtml(step.returnValue || 'void') + '</span>';
+            html += ' <span class="result-value">=> ' + escapeHtml(step.returnValue || 'void') + '</span>';
             html += '<span class="result-meta">(' + escapeHtml(step.returnType || '?') + ', ' + step.duration + 'ms)</span>';
         }
         html += '</div>';
@@ -1353,23 +1392,49 @@ function convertParamsFromTree(step) {
 
 /**
  * Update chainSteps with response data from backend.
+ * The response tree is target-linked: root is the outermost step,
+ * each node.target points to the next inner step.
+ * Our chainSteps[] is flat: [innermost, ..., outermost].
+ *
+ * count: how many steps from chainSteps to update (from chainSteps[0] to chainSteps[count-1]).
+ * If not specified, defaults to chainSteps.length.
+ * This is critical for invokeChainUpTo where only steps 0..N are invoked,
+ * so the response tree root corresponds to chainSteps[N] (not chainSteps[last]).
  */
-function updateResultsFromTree(tree) {
+function updateResultsFromTree(tree, count) {
     if (!tree) return;
-    var responseSteps = flattenTreeToSteps(tree);
-    // Also need to handle sub-chain params in the response
-    for (var i = 0; i < chainSteps.length && i < responseSteps.length; i++) {
-        mergeResponseToStep(chainSteps[i], responseSteps[i]);
+    if (chainSteps.length === 0) return;
+    var n = (count !== undefined && count !== null) ? Math.min(count, chainSteps.length) : chainSteps.length;
+    if (n <= 0) return;
+
+    // Walk the response tree from outermost to innermost via .target chain.
+    // chainSteps[0] = innermost, chainSteps[n-1] = outermost (for the invoked range).
+    // The tree root IS the outermost step of the invoked range.
+    // Match: chainSteps[n-1] ↔ tree, chainSteps[n-2] ↔ tree.target, ... chainSteps[0] ↔ deepest target
+    var respNode = tree;
+    for (var i = n - 1; i >= 0; i--) {
+        if (respNode) {
+            console.log('[merge] chainSteps[' + i + '] "' + (chainSteps[i].methodName || chainSteps[i].className) + '" ↔ resp "' + (respNode.methodName || respNode.className || '?') + '" exception=' + (respNode.exception || 'null') + ' returnType=' + (respNode.returnType || 'null'));
+            mergeResponseToStep(chainSteps[i], respNode);
+            respNode = respNode.target || null;
+        } else {
+            console.log('[merge] chainSteps[' + i + '] "' + (chainSteps[i].methodName || chainSteps[i].className) + '" ↔ NO resp node (target chain exhausted)');
+        }
     }
 }
 
 function mergeResponseToStep(model, resp) {
     if (!model || !resp) return;
-    if (resp.returnType) model.returnType = resp.returnType;
-    if (resp.returnValue) model.returnValue = resp.returnValue;
-    if (resp.isVoid !== undefined) model.isVoid = resp.isVoid;
-    if (resp.exception) model.exception = resp.exception;
-    if (resp.duration !== undefined) model.duration = resp.duration;
+    // Always clear exception first — if the backend response doesn't include it,
+    // the step succeeded and any previous exception must be cleared.
+    // Backend omits "exception" field when null (success), so resp.exception is undefined.
+    model.exception = resp.exception || null;
+    // returnType and returnValue: use resp value if present, clear to empty if not.
+    // Backend omits these when null (failed step), so resp fields are undefined.
+    model.returnType = resp.returnType || '';
+    model.returnValue = resp.returnValue || '';
+    model.isVoid = resp.isVoid !== undefined ? resp.isVoid : false;
+    model.duration = resp.duration !== undefined ? resp.duration : 0;
     if (!model._returnTypeHint && resp.returnType) model._returnTypeHint = resp.returnType;
     // Normalize paramTypes from response (backend returns array, our model uses string)
     if (resp.paramTypes) model.paramTypes = normalizeParamTypes(resp.paramTypes);
@@ -1387,12 +1452,24 @@ function mergeResponseToStep(model, resp) {
                 if (rParam.returnType) mParam.returnType = rParam.returnType;
                 if (rParam.returnValue) mParam.returnValue = rParam.returnValue;
             } else if (mParam.callType === 'subchain') {
-                // The response param might be a target-linked tree (method chain)
-                // Flatten it and merge with our subSteps
-                var rSubSteps = flattenTreeToSteps(rParam);
+                // The response param is a target-linked tree (method chain).
+                // Instead of flattenTreeToSteps which can misalign due to skip logic,
+                // walk the target chain from outermost→innermost and match with
+                // subSteps in reverse order (subSteps[last]=outermost, subSteps[0]=innermost).
                 var mSubSteps = mParam.subSteps || [];
-                for (var j = 0; j < mSubSteps.length && j < rSubSteps.length; j++) {
-                    mergeResponseToStep(mSubSteps[j], rSubSteps[j]);
+                if (mSubSteps.length > 0) {
+                    // Walk the response tree to find the node matching each sub-step
+                    // The response param IS the outermost sub-step.
+                    // Its target chain goes: outermost → ... → innermost.
+                    // Our subSteps order is: [innermost, ..., outermost].
+                    // So we match subSteps[last] with rParam, subSteps[last-1] with rParam.target, etc.
+                    var respNode = rParam;
+                    for (var k = mSubSteps.length - 1; k >= 0; k--) {
+                        if (respNode) {
+                            mergeResponseToStep(mSubSteps[k], respNode);
+                            respNode = respNode.target || null;
+                        }
+                    }
                 }
             } else if (mParam.callType === 'method' || mParam.callType === 'field') {
                 // The response param is a chain node ? merge directly

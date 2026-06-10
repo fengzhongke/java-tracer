@@ -86,6 +86,7 @@
         .step-name .ret-value { color: #3c763d; font-weight: bold; font-size: 12px; }
         .step-name .ret-duration { color: #999; font-size: 11px; }
         .step-name .ret-error { color: #a94442; font-size: 12px; }
+        .step-name .ret-cascade { color: #8a6d3b; font-size: 12px; font-style: italic; }
 
         /* Step actions */
         .step-actions {
@@ -120,9 +121,11 @@
             margin-bottom: 4px; background: #dff0d8; border-radius: 0 4px 4px 0;
         }
         .result-step.result-error { background: #f2dede; border-left-color: #a94442; }
+        .result-step.result-cascade { background: #fcf8e3; border-left-color: #f0ad4e; }
         .result-sig { font-weight: bold; }
         .result-value { color: #3c763d; }
         .result-value-error { color: #a94442; }
+        .result-value-cascade { color: #8a6d3b; font-style: italic; }
         .result-meta { color: #999; font-size: 11px; }
 
         /* Member selector modal */
@@ -287,5 +290,5 @@
     </div>
 </div>
 
-<script src="/static/js/invoke.js"></script>
+<script src="/static/js/invoke.js?v=2"></script>
 </body>

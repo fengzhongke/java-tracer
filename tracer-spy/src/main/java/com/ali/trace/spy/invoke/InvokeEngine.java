@@ -22,7 +22,7 @@ public class InvokeEngine {
 
     private static final InvokeEngine INSTANCE = new InvokeEngine();
     private static final int MAX_VALUE_LEN = 200;
-    private static final int MAX_DEPTH = 10;
+    private static final int MAX_DEPTH = 20;
 
     public static InvokeEngine getInstance() {
         return INSTANCE;
@@ -43,14 +43,7 @@ public class InvokeEngine {
             return node;
         }
 
-        // Depth limit to prevent stack overflow
-        if (depth > MAX_DEPTH) {
-            node.setException("max recursion depth exceeded (" + MAX_DEPTH + ")");
-            node.setDuration(0);
-            return node;
-        }
-
-        // --- Literal node ---
+        // --- Literal node --- (no recursion, safe to resolve regardless of depth)
         if (node.isLiteral()) {
             Object resolved = resolveLiteral(node.getValue(), node.getValueType());
             node.resolvedValue = resolved;
@@ -58,10 +51,11 @@ public class InvokeEngine {
             node.setReturnType(node.getValueType());
             node.setVoid(false);
             node.setDuration(0);
+            node.setException(null);
             return node;
         }
 
-        // --- className-only node (Class.forName) ---
+        // --- className-only node (Class.forName) --- (no recursion, safe to resolve regardless of depth)
         // When className is provided but methodName is empty/null,
         // resolve the class directly and return the Class<?> object.
         // This is useful when a parameter needs a Class object (e.g. getBean(Class)).
@@ -77,6 +71,16 @@ public class InvokeEngine {
             node.setReturnType("Class");
             node.setReturnValue(clazz.getName());
             node.setVoid(false);
+            node.setDuration(0);
+            node.setException(null);
+            return node;
+        }
+
+        // --- Non-terminal nodes: method calls and field accesses ---
+        // These involve recursive evaluation of target and params, so depth limit applies.
+        // Depth limit to prevent stack overflow
+        if (depth > MAX_DEPTH) {
+            node.setException("max recursion depth exceeded (" + MAX_DEPTH + ")");
             node.setDuration(0);
             return node;
         }
