@@ -35,8 +35,9 @@ public class ClassHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/class", order = 1)
     @TraceView
-    public String index(PrintWriter writer) throws IOException {
-        return "class";
+    public String index(ModelMap map) throws IOException {
+        map.put("activePage", "class");
+        return "class-tree";
     }
 
 
@@ -101,12 +102,6 @@ public class ClassHandler implements ITraceHttpHandler {
         root.write(writer);
     }
 
-    @TracerPath(value = "/class/tree", order = 11)
-    @TraceView
-    public String tree(PrintWriter writer) throws IOException {
-        return "class-tree";
-    }
-
     @TracerPath(value = "/class/tree.json", order = 12)
     public DataRet<List<PackageNodeVO>> treeJson(PrintWriter writer) throws IOException {
         DataRet<List<PackageNodeVO>> ret = new DataRet<List<PackageNodeVO>>(true, 0, "get ok");
@@ -118,6 +113,7 @@ public class ClassHandler implements ITraceHttpHandler {
             PackageNodeVO loaderRoot = new PackageNodeVO();
             loaderRoot.setName(loader.toString());
             loaderRoot.setFullPath(loader.toString());
+            loaderRoot.setLoaderId(loader.getId());
 
             // Build package hierarchy for all classes in this loader
             PackageNodeVO packageRoot = new PackageNodeVO("root", "");
@@ -149,6 +145,42 @@ public class ClassHandler implements ITraceHttpHandler {
         return ret;
     }
 
+    @TracerPath(value = "/class/tree/config", order = 13)
+    public DataRet<ConfigVO> treeConfig() throws IOException {
+        DataRet<ConfigVO> ret = null;
+        try {
+            ConfigPool pool = ConfigPool.getPool();
+            List<String> config = pool.getConfig();
+            Set<String>[] prefixes = pool.getConfigPrefixes();
+            ConfigVO configVO = new ConfigVO(config.get(0), config.get(1), prefixes[0], prefixes[1]);
+            ret = new DataRet<ConfigVO>(true, 0, "get ok");
+            ret.setData(configVO);
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "get failed" + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/tree/set", order = 14)
+    public DataRet<String> treeSet(@TraceParam("action") String action,
+        @TraceParam("prefix") String prefix) throws IOException {
+        DataRet<String> ret = null;
+        try {
+            ConfigPool.getPool().incrementalConfig(action, prefix);
+            ret = new DataRet(true, 0, "config updated");
+        } catch (Exception e) {
+            ret = new DataRet(false, -1, "config update failed: " + e.getMessage());
+        }
+        return ret;
+    }
+
+    @TracerPath(value = "/class/tree/progress", order = 15)
+    public DataRet<ConfigPool.RetransformProgress> treeProgress() throws IOException {
+        DataRet<ConfigPool.RetransformProgress> ret = new DataRet<>(true, 0, "ok");
+        ret.setData(ConfigPool.getPool().getProgress());
+        return ret;
+    }
+
     /**
      * Add a class to the package tree hierarchy
      */
@@ -169,7 +201,11 @@ public class ClassHandler implements ITraceHttpHandler {
             PackageNodeVO child = current.getChild(part);
             if (child == null) {
                 child = new PackageNodeVO(part, fullPath.toString());
+                child.setLoaderId(loaderId);  // Propagate loaderId to package nodes
                 current.addChild(child);
+            } else if (child.getLoaderId() == 0) {
+                // Set loaderId if not yet set (node may have been created by another class)
+                child.setLoaderId(loaderId);
             }
             current = child;
         }

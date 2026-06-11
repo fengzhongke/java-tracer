@@ -1,5 +1,43 @@
 var treeData = null;
 var totalClasses = 0;
+var includePrefixes = [];
+var excludePrefixes = [];
+var currentConfigPath = '';
+var progressTimer = null;
+
+function loadConfig() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/class/tree/config', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var response = JSON.parse(xhr.responseText);
+            if (response.status) {
+                var data = response.data;
+                document.getElementById('includeLabel').innerText = data.include || '';
+                document.getElementById('excludeLabel').innerText = data.exclude || '';
+                includePrefixes = data.includePrefixes || [];
+                excludePrefixes = data.excludePrefixes || [];
+            }
+        }
+    };
+    xhr.send();
+}
+
+function loadTree() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/class/tree.json', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var response = JSON.parse(xhr.responseText);
+            if (response.status) {
+                buildTree(response.data);
+            } else {
+                document.getElementById('treeContent').innerHTML = '<span class="text-danger">Error: ' + response.msg + '</span>';
+            }
+        }
+    };
+    xhr.send();
+}
 
 function buildTree(data) {
     treeData = data;
@@ -50,6 +88,9 @@ function buildPackageTree(children, level) {
             html += '<span class="tree-icon glyphicon glyphicon-file"></span>';
             html += '<span class="class-name">' + node.name + '</span>';
             html += '<span class="badge" style="margin-left:10px;">' + woven + '/' + total + '</span>';
+            html += '<button class="btn btn-xs btn-default config-btn" data-path="' + node.fullPath + '" data-is-class="true" onclick="openConfigModal(this)">';
+            html += '<span class="glyphicon glyphicon-cog"></span>';
+            html += '</button>';
             html += '</div>';
         } else {
             // Package node - has children
@@ -62,6 +103,9 @@ function buildPackageTree(children, level) {
             html += '<span class="node-name">' + node.name + '</span>';
             // 显示 woven数量/总数量 格式
             html += '<span class="badge" style="margin-left:10px;">' + wovenCount + '/' + totalCount + '</span>';
+            html += '<button class="btn btn-xs btn-default config-btn" data-path="' + node.fullPath + '" data-is-class="false" onclick="openConfigModal(this)">';
+            html += '<span class="glyphicon glyphicon-cog"></span>';
+            html += '</button>';
             html += '</div>';
             html += '<div class="tree-children">';
 
@@ -76,6 +120,117 @@ function buildPackageTree(children, level) {
     }
     return html;
 }
+
+function openConfigModal(btn) {
+    var path = btn.getAttribute('data-path');
+    var isClass = btn.getAttribute('data-is-class') === 'true';
+    currentConfigPath = path;
+
+    document.getElementById('configModalTitle').innerText = isClass ? 'Configure Class' : 'Configure Package';
+    document.getElementById('configModalPath').innerText = path;
+
+    // Determine current filter status by checking prefix matches
+    var matchedInclude = null;
+    var matchedExclude = null;
+
+    for (var i = 0; i < includePrefixes.length; i++) {
+        if (path.startsWith(includePrefixes[i]) || includePrefixes[i] === '*') {
+            matchedInclude = includePrefixes[i];
+            break;
+        }
+    }
+
+    for (var i = 0; i < excludePrefixes.length; i++) {
+        if (path.startsWith(excludePrefixes[i])) {
+            matchedExclude = excludePrefixes[i];
+            break;
+        }
+    }
+
+    var statusEl = document.getElementById('configModalStatus');
+    // Exclude takes priority (matching filter() logic)
+    if (matchedExclude) {
+        statusEl.innerHTML = '<span class="config-status-excluded">Currently excluded by prefix: ' + matchedExclude + '</span>';
+    } else if (matchedInclude) {
+        statusEl.innerHTML = '<span class="config-status-included">Currently included by prefix: ' + matchedInclude + '</span>';
+    } else {
+        statusEl.innerHTML = '<span class="config-status-default">Not matched by any prefix (default excluded)</span>';
+    }
+
+    // Show/hide remove buttons based on current status
+    document.getElementById('actionRemoveInclude').style.display = matchedInclude ? 'block' : 'none';
+    document.getElementById('actionRemoveExclude').style.display = matchedExclude ? 'block' : 'none';
+
+    $('#configModal').modal('show');
+}
+
+function doConfigAction(action) {
+    var prefix = currentConfigPath;
+    $.post('/class/tree/set', {action: action, prefix: prefix}, function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status) {
+            $('#configModal').modal('hide');
+            // Show progress bar and start polling
+            showProgress();
+            startProgressPolling();
+        } else {
+            alert('Failed: ' + ret.msg);
+        }
+    });
+}
+
+function showProgress() {
+    document.getElementById('progressSection').style.display = 'block';
+    updateProgressBar(0, 0, 0);
+}
+
+function hideProgress() {
+    document.getElementById('progressSection').style.display = 'none';
+}
+
+function updateProgressBar(total, done, failed) {
+    var percent = total > 0 ? Math.round(done * 100 / total) : 0;
+    var bar = document.getElementById('progressBar');
+    bar.style.width = percent + '%';
+    bar.setAttribute('aria-valuenow', percent);
+    document.getElementById('progressPercent').innerText = percent + '%';
+    document.getElementById('progressText').innerText =
+        'Retransforming: ' + done + ' / ' + total + ' classes (' + failed + ' failed)';
+}
+
+function startProgressPolling() {
+    if (progressTimer) {
+        clearInterval(progressTimer);
+    }
+    progressTimer = setInterval(function() {
+        $.get('/class/tree/progress', function(str) {
+            var ret = JSON.parse(str);
+            if (ret.status) {
+                var p = ret.data;
+                updateProgressBar(p.total, p.done, p.failed);
+                if (p.status === 'complete') {
+                    clearInterval(progressTimer);
+                    progressTimer = null;
+                    // Change progress bar to success style
+                    var bar = document.getElementById('progressBar');
+                    bar.classList.remove('active');
+                    bar.classList.remove('progress-bar-striped');
+                    bar.classList.add('progress-bar-success');
+                    // Refresh data after retransform completes
+                    loadConfig();
+                    loadTree();
+                    // Auto-hide progress after 3 seconds
+                    setTimeout(hideProgress, 3000);
+                }
+            }
+        });
+    }, 300);
+}
+
+$('#actionAddInclude').click(function() { doConfigAction('addInclude'); });
+$('#actionAddExclude').click(function() { doConfigAction('addExclude'); });
+$('#actionRemoveInclude').click(function() { doConfigAction('removeInclude'); });
+$('#actionRemoveExclude').click(function() { doConfigAction('removeExclude'); });
 
 function toggleNode(item) {
     var children = item.nextElementSibling;
@@ -205,17 +360,6 @@ document.getElementById('searchInput').addEventListener('input', function() {
     filterTree(this.value);
 });
 
-// Load tree data
-var xhr = new XMLHttpRequest();
-xhr.open('GET', '/class/tree.json', true);
-xhr.onload = function() {
-    if (xhr.status === 200) {
-        var response = JSON.parse(xhr.responseText);
-        if (response.status) {
-            buildTree(response.data);
-        } else {
-            document.getElementById('treeContent').innerHTML = '<span class="text-danger">Error: ' + response.msg + '</span>';
-        }
-    }
-};
-xhr.send();
+// Load config and tree data on page load
+loadConfig();
+loadTree();

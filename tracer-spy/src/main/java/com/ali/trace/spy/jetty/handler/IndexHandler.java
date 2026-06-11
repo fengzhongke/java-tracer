@@ -33,7 +33,8 @@ public class IndexHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/index", order = 1)
     @TraceView
-    public String index(PrintWriter writer) throws IOException {
+    public String index(ModelMap map) throws IOException {
+        map.put("activePage", "index");
         return "index";
     }
 

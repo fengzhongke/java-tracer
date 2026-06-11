@@ -4,28 +4,23 @@
     <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="/static/css/home.css?v=1.2" media="print">
+    <style>
+        .class-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
+        .class-item:hover { background:#f5f5f5; }
+        .method-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
+        .method-item:hover { background:#dff0d8; }
+        .method-name { font-weight:bold; }
+        .method-sig { color:#888; font-size:12px; }
+        .badge-static { background:#5bc0de; color:#fff; font-size:11px; padding:1px 4px; border-radius:3px; }
+        .badge-inherited { background:#f0ad4e; color:#fff; font-size:11px; padding:1px 4px; border-radius:3px; }
+        #setClassSearchArea { margin-bottom:15px; }
+        #setMethodListArea { display:none; margin-bottom:15px; }
+        .member-section-header { font-weight:bold; padding:4px 8px; background:#eee; margin-top:5px; font-size:13px; }
+    </style>
 </head>
 
 <body>
-<div class="row clearfix">
-    <div class="col-md-12 column">
-        <nav class="navbar navbar-inverse" role="navigation">
-            <div class="container-fluid">
-                <div class="navbar-header">
-                    <a class="navbar-brand" href="/">java-tracer</a>
-                </div>
-                <div>
-                    <ul class="nav navbar-nav">
-                        <li class="active"><a href="/index">index</a></li>
-                        <li><a href="/class">class</a></li>
-                        <li><a href="/package">package</a></li>
-                        <li><a href="/unload">unload</a></li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </div>
-</div>
+#parse("static/vm/navbar.vm")
 
 <div class="container">
     <div class="list-group">
@@ -36,61 +31,36 @@
         </a>
         <div class="list-group-item" id="form_set">
             <div class="list-group-item" target="_blank">
-                <div class="row clearfix list-item-inline">
-                    <div class="col-md-10 column">
-                        <div class="input-group col-md-7">
-                            <span class="input-group-addon">cname:</span>
-                            <label type="text" class="form-control" name="cname"></label>
-                        </div>
-                    </div>
-                    <div class="col-md-1 column btn-group-sm">
-                        <button class="btn btn-primary" type="button"  data-toggle="modal" data-target="#myModal" id="index_set">
-                            <span class="glyphicon glyphicon-edit"></span> set
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="list-group-item" target="_blank">
-                <div class="row clearfix list-item-inline">
-                    <div class="col-md-10 column">
-                        <div class="input-group col-md-7">
-                            <span class="input-group-addon">mname:</span>
-                            <label type="text" class="form-control" name="mname"></label>
-                        </div>
-                    </div>
-                    <div class="col-md-1 column btn-group-sm">
-                        <button class="btn btn-info" type="button" name="auto_refresh" id="index_refresh">
-                            <span class="glyphicon glyphicon-search"></span> refresh
-                        </button>
-                    </div>
-                </div>
+                <button class="btn btn-primary btn-sm" type="button" id="index_set">
+                    <span class="glyphicon glyphicon-edit"></span> set
+                </button>
             </div>
             <div class="list-group-item" target="_blank">
                 <div class="row clearfix list-item-inline">
-                    <div class="col-md-10 column">
-                        <div class="input-group col-md-7">
+                    <div class="col-md-2 column">
+                        <div class="input-group">
                             <span class="input-group-addon">type:</span>
                             <label type="text" class="form-control" name="type"></label>
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="list-group-item" target="_blank">
-                <div class="row clearfix list-item-inline">
-                    <div class="col-md-10 column">
-                        <div class="input-group col-md-7">
+                    <div class="col-md-2 column">
+                        <div class="input-group">
                             <span class="input-group-addon">size:</span>
                             <label type="text" class="form-control" name="size"></label>
                         </div>
                     </div>
+                    <div class="col-md-8 column">
+                        <div class="input-group">
+                            <span class="input-group-addon">method:</span>
+                            <label type="text" class="form-control" name="method"></label>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <br>
         </div>
         <div class="list-group-item">
             <table class="table table-hover table-bordered" id="form_list">
-                <caption>result list</caption>
+                <caption><button class="btn btn-info btn-xs" name="auto_refresh" id="index_refresh" style="margin-left:5px;"><span class="glyphicon glyphicon-search"></span> refresh</button></caption>
                 <thead>
                 <tr class="info">
                     <th style="width:20%">name</th>
@@ -111,47 +81,59 @@
         </div>
     </div>
 </div>
-<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+
+<div class="modal fade" id="setModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-                <h4 class="modal-title" id="myModalLabel">set method to trace</h4>
+                <h4 class="modal-title">Set Method to Trace</h4>
             </div>
             <div class="modal-body">
-                <div class="form-group">
+                <div id="setClassSearchArea">
                     <div class="input-group">
-                        <span class="input-group-addon">cname</span>
-                        <input type="text" class="form-control" placeholder="class name" name="model_cname">
+                        <span class="input-group-addon">Class</span>
+                        <input type="text" class="form-control" id="setClassSearchInput" placeholder="Type class name prefix...">
+                        <span class="input-group-btn">
+                            <button class="btn btn-primary" id="setClassSearchBtn">Search</button>
+                        </span>
                     </div>
-                    <br>
-                    <div class="input-group">
-                        <span class="input-group-addon">mname</span>
-                        <input type="text" class="form-control" placeholder="method name" name="model_mname">
+                    <div id="setClassList" style="max-height:200px; overflow-y:auto; margin-top:10px; border:1px solid #ddd; border-radius:4px;"></div>
+                </div>
+
+                <div id="setMethodListArea">
+                    <div style="margin-bottom:8px;">
+                        <span style="font-weight:bold;">Selected Class: </span>
+                        <span id="setSelectedClassName" style="color:#31708f;"></span>
+                        <button class="btn btn-xs btn-default" id="setChangeClassBtn" style="margin-left:10px;">Change Class</button>
                     </div>
-                    <br>
+                    <div id="setMethodList" style="max-height:300px; overflow-y:auto; border:1px solid #ddd; border-radius:4px;"></div>
+                </div>
+
+                <div id="setConfigArea" style="margin-top:15px;">
                     <div class="input-group">
                         <span class="input-group-addon">type</span>
-                        <select class="form-control" name="model_type">
-                            <option value="CommonTreeInterceptor">CommonTreeInterceptor</option>
-                            <option value="CompressTreeInterceptor">CompressTreeInterceptor</option>
+                        <select class="form-control" id="setModelType">
+                            <option value="CommonTreeInterceptor">Common</option>
+                            <option value="CompressTreeInterceptor">Compress</option>
                         </select>
                     </div>
                     <br>
                     <div class="input-group">
                         <span class="input-group-addon">size</span>
-                        <input type="text" class="form-control" placeholder="result count" name="model_size">
+                        <input type="text" class="form-control" id="setModelSize" placeholder="result count" value="100">
                     </div>
-                    <br>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="index_confirm">submit</button>
+                <button type="button" class="btn btn-primary" id="setConfirm">submit</button>
             </div>
-        </div><!-- /.modal-content -->
-    </div><!-- /.modal -->
+        </div>
+    </div>
 </div>
+
 <script src="/static/js/home.js">
+    $('#index_refresh').click();
 </script>
 </body>
 </html>

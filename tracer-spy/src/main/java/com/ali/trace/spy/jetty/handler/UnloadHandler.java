@@ -17,7 +17,8 @@ public class UnloadHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/unload", order = 1)
     @TraceView
-    public String index(PrintWriter writer) throws Exception {
+    public String index(ModelMap map) throws Exception {
+        map.put("activePage", "unload");
         return "unload";
     }
 

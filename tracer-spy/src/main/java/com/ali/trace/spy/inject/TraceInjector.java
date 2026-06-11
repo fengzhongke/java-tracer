@@ -151,6 +151,56 @@ public class TraceInjector {
         return redefinedNames;
     }
 
+    /**
+     * Add a prefix to include list. Creates new HashSet to maintain volatile semantics.
+     */
+    public void addIncludePrefix(String prefix) {
+        Set<String> newSet = new HashSet<>(includePrefix);
+        newSet.add(prefix);
+        includePrefix = newSet;
+    }
+
+    /**
+     * Add a prefix to exclude list. Creates new HashSet to maintain volatile semantics.
+     */
+    public void addExcludePrefix(String prefix) {
+        Set<String> newSet = new HashSet<>(excludePrefix);
+        newSet.add(prefix);
+        excludePrefix = newSet;
+    }
+
+    /**
+     * Remove a prefix from include list. Creates new HashSet to maintain volatile semantics.
+     */
+    public void removeIncludePrefix(String prefix) {
+        Set<String> newSet = new HashSet<>(includePrefix);
+        newSet.remove(prefix);
+        includePrefix = newSet;
+    }
+
+    /**
+     * Remove a prefix from exclude list. Creates new HashSet to maintain volatile semantics.
+     */
+    public void removeExcludePrefix(String prefix) {
+        Set<String> newSet = new HashSet<>(excludePrefix);
+        newSet.remove(prefix);
+        excludePrefix = newSet;
+    }
+
+    /**
+     * Get current include prefix set (for UI status determination)
+     */
+    public Set<String> getIncludePrefixes() {
+        return includePrefix;
+    }
+
+    /**
+     * Get current exclude prefix set (for UI status determination)
+     */
+    public Set<String> getExcludePrefixes() {
+        return excludePrefix;
+    }
+
     public boolean filter(String name) {
         for (String prefix : excludePrefix) {
             if (name.startsWith(prefix)) {

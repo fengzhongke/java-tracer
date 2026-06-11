@@ -29,6 +29,7 @@ public class TraceHandler implements ITraceHttpHandler {
     @TraceView
     public String trace(ModelMap map, @TraceParam("id") String id) throws IOException {
         map.put("id", id);
+        map.put("activePage", "index");  // trace detail doesn't have its own nav entry
         return "trace";
     }
 

@@ -20,9 +20,10 @@ import java.util.Map.Entry;
  */
 public class ThreadHandler implements ITraceHttpHandler {
 
-    @TracerPath(value = "/thread/tree", order = 1)
+    @TracerPath(value = "/thread", order = 1)
     @TraceView
-    public String index(PrintWriter writer) throws IOException {
+    public String index(ModelMap map) throws IOException {
+        map.put("activePage", "thread");
         return "thread-tree";
     }
 

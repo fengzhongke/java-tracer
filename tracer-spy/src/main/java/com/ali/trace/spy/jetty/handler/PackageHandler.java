@@ -25,7 +25,8 @@ public class PackageHandler implements ITraceHttpHandler {
 
     @TracerPath(value = "/package", order = 1)
     @TraceView
-    public String index() throws IOException {
+    public String index(ModelMap map) throws IOException {
+        map.put("activePage", "package");
         return "package";
     }
 

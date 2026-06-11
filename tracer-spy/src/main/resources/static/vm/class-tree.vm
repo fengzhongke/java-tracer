@@ -1,5 +1,5 @@
 <head>
-    <title>Class Tree View</title>
+    <title>Class View</title>
     <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
     <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
@@ -46,36 +46,92 @@
             margin-bottom: 10px;
             color: #666;
         }
+        .config-btn {
+            opacity: 0.3;
+            transition: opacity 0.2s;
+            padding: 1px 4px;
+            font-size: 11px;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+        .tree-item:hover .config-btn {
+            opacity: 1;
+        }
+        .config-modal-info {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .config-modal-info .path-label {
+            font-weight: bold;
+            color: #31708f;
+        }
+        .config-modal-info .status-label {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .config-status-included { color: #3c763d; }
+        .config-status-excluded { color: #a94442; }
+        .config-status-default { color: #999; }
+        #configModalActions .btn-block {
+            margin-bottom: 8px;
+        }
+        #configDisplay {
+            margin-bottom: 10px;
+        }
+        #progressSection {
+            display: none;
+            margin-bottom: 10px;
+        }
+        #progressSection .progress {
+            margin-bottom: 5px;
+        }
+        #progressSection .progress-info {
+            font-size: 12px;
+            color: #666;
+        }
     </style>
 </head>
 
 <body>
-<div class="row clearfix">
-    <div class="col-md-12 column">
-        <nav class="navbar navbar-inverse" role="navigation">
-            <div class="container-fluid">
-                <div class="navbar-header">
-                    <a class="navbar-brand" href="/">java-tracer</a>
-                </div>
-                <div>
-                    <ul class="nav navbar-nav">
-                        <li><a href="/index">index</a></li>
-                        <li><a href="/class">class</a></li>
-                        <li><a href="/package">package</a></li>
-                        <li><a href="/unload">unload</a></li>
-                        <li class="active"><a href="/class/tree">class tree</a></li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </div>
-</div>
+#parse("static/vm/navbar.vm")
 
 <div class="container">
     <div class="list-group">
         <a href="#" class="list-group-item active">
-            <h4 class="list-group-item-heading">Class Loader Tree</h4>
+            <h4 class="list-group-item-heading">Class View</h4>
         </a>
+
+        <div class="list-group-item" id="configDisplay">
+            <div class="row clearfix list-item-inline">
+                <div class="col-md-10 column">
+                    <div class="input-group col-md-12">
+                        <span class="input-group-addon">include:</span>
+                        <label type="text" class="form-control" id="includeLabel" style="min-height:20px;"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="row clearfix list-item-inline" style="margin-top:5px;">
+                <div class="col-md-10 column">
+                    <div class="input-group col-md-12">
+                        <span class="input-group-addon">exclude:</span>
+                        <label type="text" class="form-control" id="excludeLabel" style="min-height:20px;"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-group-item" id="progressSection">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped active" id="progressBar" role="progressbar" style="width: 0%;">
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+            <div class="progress-info">
+                <span id="progressText">Retransforming: 0 / 0 classes (0 failed)</span>
+            </div>
+        </div>
 
         <div class="list-group-item">
             <div class="row clearfix search-box">
@@ -105,6 +161,32 @@
                 <div id="treeContent">
                     <span class="text-muted">Loading...</span>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="configModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="configModalTitle">Configure</h4>
+            </div>
+            <div class="modal-body">
+                <div class="config-modal-info">
+                    <div><span>Path: </span><span class="path-label" id="configModalPath"></span></div>
+                    <div class="status-label" id="configModalStatus"></div>
+                </div>
+                <div id="configModalActions">
+                    <button class="btn btn-success btn-block" id="actionAddInclude">Add to Include</button>
+                    <button class="btn btn-danger btn-block" id="actionAddExclude">Add to Exclude</button>
+                    <button class="btn btn-warning btn-block" id="actionRemoveInclude">Remove from Include</button>
+                    <button class="btn btn-warning btn-block" id="actionRemoveExclude">Remove from Exclude</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

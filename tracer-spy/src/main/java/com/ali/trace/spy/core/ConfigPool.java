@@ -28,12 +28,20 @@ public class ConfigPool {
     private final AtomicInteger SEQ_SEED = new AtomicInteger(0);
 
     private CopyOnWriteArrayList<LoaderSet> loaderSets = new CopyOnWriteArrayList<LoaderSet>();
+    // Stable ClassLoader -> ID mapping, ensures same ClassLoader always gets same ID
+    private ConcurrentHashMap<ClassLoader, Integer> loaderIdMap = new ConcurrentHashMap<ClassLoader, Integer>();
     private Class<?> weaveClass;
     private Instrumentation inst;
     private TraceInjector injector;
     private volatile ClassLoader redefineLoader;
     private volatile String redefineName;
     private EmptyTransformer emptyTransformer = new EmptyTransformer();
+
+    // Retransform progress tracking
+    private volatile int progressTotal = 0;
+    private volatile int progressDone = 0;
+    private volatile int progressFailed = 0;
+    private volatile String progressStatus = "idle"; // idle, running, complete
 
     public static ConfigPool getPool() {
         return INSTANCE;
@@ -44,6 +52,7 @@ public class ConfigPool {
      */
     public void clear() {
         loaderSets.clear();
+        loaderIdMap.clear();
         weaveClass = null;
         inst = null;
         injector = null;
@@ -100,10 +109,23 @@ public class ConfigPool {
             ClassLoader loader = entry.getKey();
             List<Class<?>> classes = entry.getValue();
 
-            // Find existing LoaderSet or create new
+            // Find existing LoaderSet or assign stable ID
             LoaderSet loaderSet = getLoaderSet(loader);
-            if (loaderSet == null) {
-                loaderSet = new LoaderSet(SEQ_SEED.incrementAndGet(), loader);
+            int loaderId;
+            if (loaderSet != null) {
+                loaderId = loaderSet.getId();
+            } else {
+                // Use stable id map: same ClassLoader always gets same id
+                Integer existingId = loaderIdMap.get(loader);
+                if (existingId != null) {
+                    loaderId = existingId;
+                    // Also create a LoaderSet entry for this known loader
+                    loaderSet = new LoaderSet(loaderId, loader);
+                } else {
+                    loaderId = SEQ_SEED.incrementAndGet();
+                    loaderIdMap.put(loader, loaderId);
+                    loaderSet = new LoaderSet(loaderId, loader);
+                }
             }
 
             // Create a new LoaderSet with all classes
@@ -166,6 +188,123 @@ public class ConfigPool {
                 }
             }
         }
+    }
+
+    /**
+     * Incrementally add/remove a prefix from include/exclude config and retransform all affected classes.
+     * The prefix change is applied globally; the retransform runs asynchronously with progress tracking.
+     * @param action one of "addInclude", "addExclude", "removeInclude", "removeExclude"
+     * @param prefix the prefix to add/remove (e.g., "com/example/api")
+     */
+    public void incrementalConfig(String action, String prefix) {
+        if (injector == null) return;
+
+        switch (action) {
+            case "addInclude":
+                injector.addIncludePrefix(prefix);
+                break;
+            case "addExclude":
+                injector.addExcludePrefix(prefix);
+                break;
+            case "removeInclude":
+                injector.removeIncludePrefix(prefix);
+                break;
+            case "removeExclude":
+                injector.removeExcludePrefix(prefix);
+                break;
+            default:
+                return;
+        }
+
+        // Collect classes that need retransform across all loaders
+        final List<LoaderSet> allLoaders = getAllLoadedClasses();
+        final List<RedefineTask> tasks = new ArrayList<>();
+        for (LoaderSet loaderSet : allLoaders) {
+            ClassLoader loader = loaderSet.getLoader();
+            for (Map.Entry<String, Integer> entry : loaderSet.classNames.entrySet()) {
+                String name = entry.getKey();
+                if (name.startsWith(prefix) || prefix.equalsIgnoreCase("*")) {
+                    boolean shouldWeave = !injector.filter(name);
+                    int currentType = entry.getValue();
+                    if (shouldWeave && currentType == 0) {
+                        tasks.add(new RedefineTask(loader, name));
+                    } else if (!shouldWeave && currentType == 1) {
+                        tasks.add(new RedefineTask(loader, name));
+                    }
+                }
+            }
+        }
+
+        // Start async retransform with progress tracking
+        progressTotal = tasks.size();
+        progressDone = 0;
+        progressFailed = 0;
+        progressStatus = "running";
+
+        new Thread(new Runnable() {
+            public void run() {
+                for (RedefineTask task : tasks) {
+                    try {
+                        redefine(task.loader, task.name);
+                        progressDone++;
+                    } catch (Throwable e) {
+                        progressFailed++;
+                        progressDone++;
+                    }
+                }
+                progressStatus = "complete";
+            }
+        }, "retransform-thread").start();
+    }
+
+    /**
+     * Get current retransform progress
+     */
+    public RetransformProgress getProgress() {
+        return new RetransformProgress(progressTotal, progressDone, progressFailed, progressStatus);
+    }
+
+    /**
+     * Internal task holder for async retransform
+     */
+    private static class RedefineTask {
+        final ClassLoader loader;
+        final String name;
+        RedefineTask(ClassLoader loader, String name) {
+            this.loader = loader;
+            this.name = name;
+        }
+    }
+
+    /**
+     * Simple progress data holder (no VO dependency)
+     */
+    public static class RetransformProgress {
+        public final int total;
+        public final int done;
+        public final int failed;
+        public final String status;
+        RetransformProgress(int total, int done, int failed, String status) {
+            this.total = total;
+            this.done = done;
+            this.failed = failed;
+            this.status = status;
+        }
+        @Override
+        public String toString() {
+            return "{\"total\":" + total + ",\"done\":" + done + ",\"failed\":" + failed + ",\"status\":\"" + status + "\"}";
+        }
+    }
+
+    /**
+     * Get current include/exclude prefix sets for UI display
+     * @return array of [includePrefixSet, excludePrefixSet]
+     */
+    public Set<String>[] getConfigPrefixes() {
+        if (injector == null) {
+            return new Set[]{new HashSet<>(), new HashSet<>()};
+        }
+        return new Set[]{injector.getIncludePrefixes(), injector.getExcludePrefixes()};
     }
 
     public List<String> getConfig() {

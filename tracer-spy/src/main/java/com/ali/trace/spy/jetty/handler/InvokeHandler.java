@@ -37,7 +37,8 @@ public class InvokeHandler implements ITraceHttpHandler {
      */
     @TracerPath(value = "/invoke", order = 1)
     @TraceView
-    public String index() {
+    public String index(ModelMap map) {
+        map.put("activePage", "invoke");
         return "invoke";
     }
 

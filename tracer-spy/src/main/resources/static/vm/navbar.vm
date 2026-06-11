@@ -1,0 +1,20 @@
+<div class="row clearfix">
+    <div class="col-md-12 column">
+        <nav class="navbar navbar-inverse" role="navigation">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">java-tracer</a>
+                </div>
+                <div>
+                    <ul class="nav navbar-nav">
+                        <li#if($activePage == 'index') class="active"#end><a href="/index">index</a></li>
+                        <li#if($activePage == 'class') class="active"#end><a href="/class">class</a></li>
+                        <li#if($activePage == 'thread') class="active"#end><a href="/thread">thread</a></li>
+                        <li#if($activePage == 'invoke') class="active"#end><a href="/invoke">invoke</a></li>
+                        <li#if($activePage == 'unload') class="active"#end><a href="/unload">unload</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </div>
+</div>

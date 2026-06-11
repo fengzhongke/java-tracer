@@ -13,7 +13,7 @@ public class PackageNodeVO {
     private int totalCount;        // 总数量（包含子节点）
     private boolean isClass;       // true if this is a class node, false if package
     private int type;              // class type (1=woven, 0=not woven)
-    private int loaderId;          // classloader id
+    private int loaderId;          // classloader id (propagated from parent for package nodes)
     private List<PackageNodeVO> children = new ArrayList<PackageNodeVO>();
 
     public PackageNodeVO() {}
@@ -130,6 +130,9 @@ public class PackageNodeVO {
         sb.append(",\"totalCount\":").append(totalCount);
         if (isClass) {
             sb.append(",\"type\":").append(type);
+            sb.append(",\"loaderId\":").append(loaderId);
+        } else if (loaderId > 0) {
+            // Package nodes also carry loaderId for scoped config operations
             sb.append(",\"loaderId\":").append(loaderId);
         }
         sb.append(",\"children\":");
