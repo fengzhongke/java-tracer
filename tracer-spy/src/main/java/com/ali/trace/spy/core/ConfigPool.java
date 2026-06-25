@@ -83,12 +83,18 @@ public class ConfigPool {
      */
     public List<LoaderSet> getAllLoadedClasses() {
         if (inst == null) {
+            System.out.println("[tracer-debug] ConfigPool.inst is NULL, returning cached loaderSets (size=" + loaderSets.size() + ")");
             return loaderSets;
         }
 
         // Build a map of ClassLoader -> List<Class>
         Map<ClassLoader, List<Class<?>>> loaderClassMap = new ConcurrentHashMap<ClassLoader, List<Class<?>>>();
         Class<?>[] allClasses = inst.getAllLoadedClasses();
+        int englishCount = 0;
+        for (Class<?> c : allClasses) {
+            if (c.getName().startsWith("com.english")) englishCount++;
+        }
+        System.out.println("[tracer-debug] inst.getAllLoadedClasses() returned " + allClasses.length + " classes, com.english count=" + englishCount);
 
         for (Class<?> clazz : allClasses) {
             ClassLoader loader = clazz.getClassLoader();

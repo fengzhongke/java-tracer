@@ -8,7 +8,6 @@
                 <div>
                     <ul class="nav navbar-nav">
                         <li#if($activePage == 'index') class="active"#end><a href="/index">index</a></li>
-                        <li#if($activePage == 'class') class="active"#end><a href="/class">class</a></li>
                         <li#if($activePage == 'thread') class="active"#end><a href="/thread">thread</a></li>
                         <li#if($activePage == 'invoke') class="active"#end><a href="/invoke">invoke</a></li>
                         <li#if($activePage == 'unload') class="active"#end><a href="/unload">unload</a></li>

@@ -3,8 +3,9 @@
     <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
     <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
-    <link rel="stylesheet" href="/static/css/home.css?v=1.2" media="print">
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2">
     <style>
+        /* index set modal styles */
         .class-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
         .class-item:hover { background:#f5f5f5; }
         .method-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
@@ -16,6 +17,99 @@
         #setClassSearchArea { margin-bottom:15px; }
         #setMethodListArea { display:none; margin-bottom:15px; }
         .member-section-header { font-weight:bold; padding:4px 8px; background:#eee; margin-top:5px; font-size:13px; }
+
+        /* class tree styles */
+        .tree-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .tree-item {
+            cursor: pointer;
+            padding: 3px 5px;
+            margin: 2px 0;
+        }
+        .tree-item:hover {
+            background-color: #f5f5f5;
+        }
+        .tree-icon {
+            margin-right: 5px;
+        }
+        .tree-children {
+            display: none;
+            margin-left: 20px;
+        }
+        .tree-children.expanded {
+            display: block;
+        }
+        .tree-loader {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .tree-class {
+            color: #555;
+        }
+        .type-0 { color: #999; }
+        .type-1 { color: #5cb85c; }
+        .config-btn {
+            opacity: 0.3;
+            transition: opacity 0.2s;
+            padding: 1px 4px;
+            font-size: 11px;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+        .tree-item:hover .config-btn {
+            opacity: 1;
+        }
+        .config-modal-info {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        .config-modal-info .path-label {
+            font-weight: bold;
+            color: #31708f;
+        }
+        .config-modal-info .status-label {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .config-status-included { color: #3c763d; }
+        .config-status-excluded { color: #a94442; }
+        .config-status-default { color: #999; }
+        #configModalActions .btn-block {
+            margin-bottom: 8px;
+        }
+        #configDisplay {
+            margin-bottom: 10px;
+        }
+        #progressSection {
+            display: none;
+            margin-bottom: 10px;
+        }
+        #progressSection .progress {
+            margin-bottom: 5px;
+        }
+        #progressSection .progress-info {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* inline config row */
+        .config-inline-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+        }
+        .config-inline-row .input-group {
+            width: auto;
+            min-width: 120px;
+        }
     </style>
 </head>
 
@@ -23,44 +117,42 @@
 #parse("static/vm/navbar.vm")
 
 <div class="container">
+    <!-- Section 1: Trace Config + List -->
     <div class="list-group">
         <a href="#" class="list-group-item active">
-            <h4 class="list-group-item-heading">
-                trace
-            </h4>
+            <h4 class="list-group-item-heading">trace</h4>
         </a>
+
+        <!-- Row 1: set button + type + size + refresh (inline) -->
         <div class="list-group-item" id="form_set">
-            <div class="list-group-item" target="_blank">
+            <div class="config-inline-row">
                 <button class="btn btn-primary btn-sm" type="button" id="index_set">
                     <span class="glyphicon glyphicon-edit"></span> set
                 </button>
+                <div class="input-group">
+                    <span class="input-group-addon">type:</span>
+                    <label type="text" class="form-control" name="type"></label>
+                </div>
+                <div class="input-group">
+                    <span class="input-group-addon">size:</span>
+                    <label type="text" class="form-control" name="size"></label>
+                </div>
+                <button class="btn btn-info btn-xs" name="auto_refresh" id="index_refresh">
+                    <span class="glyphicon glyphicon-search"></span> refresh
+                </button>
             </div>
-            <div class="list-group-item" target="_blank">
-                <div class="row clearfix list-item-inline">
-                    <div class="col-md-2 column">
-                        <div class="input-group">
-                            <span class="input-group-addon">type:</span>
-                            <label type="text" class="form-control" name="type"></label>
-                        </div>
-                    </div>
-                    <div class="col-md-2 column">
-                        <div class="input-group">
-                            <span class="input-group-addon">size:</span>
-                            <label type="text" class="form-control" name="size"></label>
-                        </div>
-                    </div>
-                    <div class="col-md-8 column">
-                        <div class="input-group">
-                            <span class="input-group-addon">method:</span>
-                            <label type="text" class="form-control" name="method"></label>
-                        </div>
-                    </div>
+            <!-- Row 2: method (full width) -->
+            <div style="padding:0 10px;">
+                <div class="input-group">
+                    <span class="input-group-addon">method:</span>
+                    <label type="text" class="form-control" name="method"></label>
                 </div>
             </div>
         </div>
+
+        <!-- Trace results table -->
         <div class="list-group-item">
             <table class="table table-hover table-bordered" id="form_list">
-                <caption><button class="btn btn-info btn-xs" name="auto_refresh" id="index_refresh" style="margin-left:5px;"><span class="glyphicon glyphicon-search"></span> refresh</button></caption>
                 <thead>
                 <tr class="info">
                     <th style="width:20%">name</th>
@@ -80,8 +172,80 @@
             </table>
         </div>
     </div>
+
+    <!-- Section 2: Class Tree -->
+    <div class="list-group">
+        <a href="#" class="list-group-item active">
+            <h4 class="list-group-item-heading">class</h4>
+        </a>
+
+        <div class="list-group-item" id="configDisplay">
+            <div class="row clearfix list-item-inline">
+                <div class="col-md-10 column">
+                    <div class="input-group col-md-12">
+                        <span class="input-group-addon">include:</span>
+                        <label type="text" class="form-control" id="includeLabel" style="min-height:20px;"></label>
+                    </div>
+                </div>
+            </div>
+            <div class="row clearfix list-item-inline" style="margin-top:5px;">
+                <div class="col-md-10 column">
+                    <div class="input-group col-md-12">
+                        <span class="input-group-addon">exclude:</span>
+                        <label type="text" class="form-control" id="excludeLabel" style="min-height:20px;"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="list-group-item" id="progressSection">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped active" id="progressBar" role="progressbar" style="width: 0%;">
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+            <div class="progress-info">
+                <span id="progressText">Retransforming: 0 / 0 classes (0 failed)</span>
+            </div>
+        </div>
+
+        <div class="list-group-item">
+            <div class="row clearfix" style="margin-bottom:10px;">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-addon">Search</span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Filter class name...">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary btn-sm" id="toggleExpandBtn">
+                        <span class="glyphicon glyphicon-folder-open"></span> Expand
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <div style="float:right;">
+                        <a href="/class/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>
+                        <a href="/class/tree.json" class="btn btn-info btn-sm" target="_blank">JSON View</a>
+                    </div>
+                </div>
+            </div>
+            <div class="stats-info">
+                <span id="loaderCount">0</span> loaders,
+                <span id="classCount">0</span> classes
+            </div>
+        </div>
+
+        <div class="list-group-item">
+            <div class="tree-container" id="treeContainer">
+                <div id="treeContent">
+                    <span class="text-muted">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<!-- Set Modal -->
 <div class="modal fade" id="setModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -132,8 +296,35 @@
     </div>
 </div>
 
+<!-- Config Modal (class tree) -->
+<div class="modal fade" id="configModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="configModalTitle">Configure</h4>
+            </div>
+            <div class="modal-body">
+                <div class="config-modal-info">
+                    <div><span>Path: </span><span class="path-label" id="configModalPath"></span></div>
+                    <div class="status-label" id="configModalStatus"></div>
+                </div>
+                <div id="configModalActions">
+                    <button class="btn btn-success btn-block" id="actionAddInclude">Add to Include</button>
+                    <button class="btn btn-danger btn-block" id="actionAddExclude">Add to Exclude</button>
+                    <button class="btn btn-warning btn-block" id="actionRemoveInclude">Remove from Include</button>
+                    <button class="btn btn-warning btn-block" id="actionRemoveExclude">Remove from Exclude</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="/static/js/home.js">
-    $('#index_refresh').click();
+    $('button[name=auto_refresh]').click();
 </script>
 </body>
 </html>

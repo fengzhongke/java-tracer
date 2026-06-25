@@ -1,0 +1,195 @@
+<head>
+    <title>Thread Tree View</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="/static/css/home.css?v=1.2">
+    <style>
+        .tree-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .tree-item {
+            cursor: pointer;
+            padding: 3px 5px;
+            margin: 2px 0;
+        }
+        .tree-item:hover {
+            background-color: #f5f5f5;
+        }
+        .tree-icon {
+            margin-right: 5px;
+        }
+        .tree-children {
+            display: none;
+            margin-left: 20px;
+        }
+        .tree-children.expanded {
+            display: block;
+        }
+        .tree-thread {
+            font-weight: bold;
+            color: #337ab7;
+        }
+        .tree-thread-leaf {
+            color: #337ab7;
+            font-size: 12px;
+        }
+        .tree-frame {
+            color: #555;
+        }
+        .state-new { color: #5cb85c; }
+        .state-runnable { color: #5cb85c; }
+        .state-blocked { color: #d9534f; }
+        .state-waiting { color: #f0ad4e; }
+        .state-timed_waiting { color: #f0ad4e; }
+        .state-terminated { color: #999; }
+        .search-box {
+            margin-bottom: 10px;
+        }
+        .stats-info {
+            margin-bottom: 10px;
+            color: #666;
+        }
+        .thread-info {
+            font-size: 12px;
+            color: #888;
+            margin-left: 10px;
+        }
+        .thread-checkbox {
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .search-path-group {
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .search-call-chain {
+            padding: 8px 10px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .search-call-chain:hover {
+            background-color: #e9ecef;
+        }
+        .search-toggle-icon {
+            margin-right: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+        .search-matched {
+            background-color: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #856404;
+        }
+        .search-frame {
+            color: #555;
+        }
+        .search-arrow {
+            color: #999;
+            margin: 0 2px;
+        }
+        .search-thread-badge {
+            margin-left: 10px;
+            font-size: 11px;
+        }
+        .search-thread-list {
+            padding: 5px 10px;
+            background-color: #fff;
+        }
+        .search-thread-item {
+            padding: 3px 5px;
+            margin: 2px 0;
+            font-size: 12px;
+        }
+        .action-bar {
+            margin-top: 10px;
+            padding: 5px 0;
+        }
+    </style>
+</head>
+
+<body>
+#parse("static/vm/navbar.vm")
+
+<div class="container">
+    <div class="list-group">
+        <a href="#" class="list-group-item active">
+            <h4 class="list-group-item-heading">Thread Stack Tree</h4>
+        </a>
+
+        <div class="list-group-item">
+            <div class="row clearfix search-box">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-addon">Search</span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Filter thread or method name...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary btn-sm" id="expandAll">Expand</button>
+                    <button class="btn btn-default btn-sm" id="collapseAll">Collapse</button>
+                </div>
+                <div class="col-md-3">
+                    <a href="/thread/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>
+                    <a href="/thread/tree.json" class="btn btn-info btn-sm" target="_blank">JSON View</a>
+                </div>
+            </div>
+            <div class="stats-info">
+                <span id="threadCount">0</span> threads,
+                <span id="frameCount">0</span> stack frames
+            </div>
+        </div>
+
+        <div class="list-group-item">
+            <div class="tree-container" id="treeContainer">
+                <div id="treeContent">
+                    <span class="text-muted">Loading...</span>
+                </div>
+            </div>
+            <div class="action-bar">
+                <button class="btn btn-success btn-sm" id="selectAllBtn">Select All</button>
+                <button class="btn btn-warning btn-sm" id="viewStackBtn">View Selected Stack</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Thread Stack Detail Modal -->
+<div class="modal fade" id="threadStackModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Thread Stack Detail <small id="samplerStats" style="color:#888;"></small></h4>
+            </div>
+            <div class="modal-body" id="threadStackBody" style="max-height:500px;overflow-y:auto;">
+            </div>
+            <div class="modal-footer">
+                <div style="display:inline-block;margin-right:15px;">
+                    <label style="font-size:12px;margin-right:5px;">Min%</label>
+                    <input type="number" class="form-control input-sm" id="thresholdInput" value="0" min="0" max="100" step="0.5" style="width:60px;display:inline-block;">
+                    <label style="font-size:12px;margin-left:10px;margin-right:5px;">TTL(s)</label>
+                    <input type="number" class="form-control input-sm" id="ttlInput" value="10" min="1" max="60" step="1" style="width:50px;display:inline-block;">
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="expandModalAll">Expand</button>
+                <button type="button" class="btn btn-default btn-sm" id="collapseModalAll">Collapse</button>
+                <button type="button" class="btn btn-primary" id="refreshStackBtn">Refresh</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/thread-tree.js"></script>
+</body>

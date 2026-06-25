@@ -24,11 +24,35 @@
             margin-right: 5px;
         }
         .tree-children {
-            display: none;
             margin-left: 20px;
         }
+        /* Collapsed state: container visible only if it has threads (to show thread names) */
+        .tree-children:not(.expanded) {
+            display: none;
+        }
+        .tree-children:not(.expanded):has(> .tree-threads:not(.hidden-threads)) {
+            display: block;
+        }
+        /* Collapsed: hide frame subtrees */
+        .tree-children:not(.expanded) > .tree-node {
+            display: none;
+        }
+        /* Expanded: show everything */
         .tree-children.expanded {
             display: block;
+        }
+        .tree-children.expanded > .tree-node {
+            display: block;
+        }
+        .tree-children.expanded > .tree-threads {
+            display: block;
+        }
+        .tree-threads {
+            display: block;
+            margin-left: 20px;
+        }
+        .tree-threads.hidden-threads {
+            display: none;
         }
         .tree-thread {
             font-weight: bold;
@@ -59,6 +83,84 @@
             color: #888;
             margin-left: 10px;
         }
+        .thread-checkbox {
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .search-path-group {
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .search-call-chain {
+            padding: 8px 10px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .search-call-chain:hover {
+            background-color: #e9ecef;
+        }
+        .search-toggle-icon {
+            margin-right: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+        .search-frame-list {
+            padding: 5px 10px 2px 10px;
+            background-color: #fdfdfe;
+            border-bottom: 1px solid #eee;
+        }
+        .search-frame-line {
+            padding: 2px 0;
+            font-size: 12px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .search-frame-matched {
+            font-weight: bold;
+        }
+        .search-frame-marker {
+            color: #999;
+            margin-right: 4px;
+            font-size: 11px;
+            width: 14px;
+            display: inline-block;
+        }
+        .search-frame-matched .search-frame-marker {
+            color: #d9534f;
+        }
+        .search-matched {
+            background-color: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #856404;
+        }
+        .search-frame {
+            color: #555;
+        }
+        .search-thread-badge {
+            margin-left: 10px;
+            font-size: 11px;
+        }
+        .search-thread-list {
+            padding: 5px 10px;
+            background-color: #fff;
+        }
+        .search-thread-item {
+            padding: 3px 5px;
+            margin: 2px 0;
+            font-size: 12px;
+        }
+        .action-bar {
+            margin-top: 10px;
+            padding: 5px 0;
+        }
     </style>
 </head>
 
@@ -72,20 +174,25 @@
         </a>
 
         <div class="list-group-item">
+            <!-- Row 1: buttons left-aligned, XML/JSON View right-aligned -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div>
+                    <button class="btn btn-info btn-sm" id="refreshTreeBtn"><span class="glyphicon glyphicon-refresh"></span> Refresh</button>
+                    <button class="btn btn-primary btn-sm" id="toggleExpandBtn">Expand All</button>
+                    <button class="btn btn-default btn-sm" id="toggleThreadsBtn">Hide Threads</button>
+                </div>
+                <div>
+                    <a href="/thread/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>
+                    <a href="/thread/tree.json" class="btn btn-info btn-sm" target="_blank">JSON View</a>
+                </div>
+            </div>
+            <!-- Row 2: Search -->
             <div class="row clearfix search-box">
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <div class="input-group">
                         <span class="input-group-addon">Search</span>
                         <input type="text" class="form-control" id="searchInput" placeholder="Filter thread or method name...">
                     </div>
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-primary btn-sm" id="expandAll">Expand All</button>
-                    <button class="btn btn-default btn-sm" id="collapseAll">Collapse All</button>
-                </div>
-                <div class="col-md-3">
-                    <a href="/thread/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>
-                    <a href="/thread/tree.json" class="btn btn-info btn-sm" target="_blank">JSON View</a>
                 </div>
             </div>
             <div class="stats-info">
@@ -100,10 +207,41 @@
                     <span class="text-muted">Loading...</span>
                 </div>
             </div>
+            <div class="action-bar">
+                <button class="btn btn-success btn-sm" id="selectAllBtn">Select All</button>
+                <button class="btn btn-warning btn-sm" id="viewStackBtn">View Selected Stack</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Thread Stack Detail Modal -->
+<div class="modal fade" id="threadStackModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Thread Stack Detail <small id="samplerStats" style="color:#888;"></small></h4>
+            </div>
+            <div class="modal-body" id="threadStackBody" style="max-height:500px;overflow-y:auto;">
+            </div>
+            <div class="modal-footer">
+                <div style="display:inline-block;margin-right:15px;">
+                    <label style="font-size:12px;margin-right:5px;">Depth</label>
+                    <input type="number" class="form-control input-sm" id="depthInput" value="0" min="0" step="1" style="width:50px;display:inline-block;">
+                    <label style="font-size:12px;margin-left:10px;margin-right:5px;">Min%</label>
+                    <input type="number" class="form-control input-sm" id="thresholdInput" value="5" min="0" max="100" step="0.5" style="width:60px;display:inline-block;">
+                    <label style="font-size:12px;margin-left:10px;margin-right:5px;">TTL(s)</label>
+                    <input type="number" class="form-control input-sm" id="ttlInput" value="10" min="1" max="60" step="1" style="width:50px;display:inline-block;">
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="toggleModalExpandBtn">Expand All</button>
+                <button type="button" class="btn btn-default btn-sm" id="toggleModalThreadsBtn">Hide Threads</button>
+                <button type="button" class="btn btn-primary" id="refreshStackBtn">Refresh</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script src="/static/js/thread-tree.js"></script>
 </body>
-</html>

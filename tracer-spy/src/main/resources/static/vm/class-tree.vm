@@ -142,8 +142,8 @@
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <button class="btn btn-primary btn-sm" id="expandAll">Expand All</button>
-                    <button class="btn btn-default btn-sm" id="collapseAll">Collapse All</button>
+                    <button class="btn btn-primary btn-sm" id="expandAll">Expand</button>
+                    <button class="btn btn-default btn-sm" id="collapseAll">Collapse</button>
                 </div>
                 <div class="col-md-3">
                     <a href="/class/get.xml" class="btn btn-success btn-sm" target="_blank">XML View</a>

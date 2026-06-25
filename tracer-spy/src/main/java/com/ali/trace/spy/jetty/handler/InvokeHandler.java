@@ -283,6 +283,69 @@ public class InvokeHandler implements ITraceHttpHandler {
      * Used by the Browse Class modal to let users find and select classes.
      * Returns up to 100 matching classes with their ClassLoader info, sorted alphabetically.
      */
+    /**
+     * Debug endpoint — dumps Instrumentation state and class loader summary
+     */
+    @TracerPath(value = "/invoke/debug.json", order = 99)
+    public DataRet<String> debug() {
+        try {
+            ConfigPool pool = ConfigPool.getPool();
+            Instrumentation inst = pool.getInst();
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("instNull=").append(inst == null);
+
+            if (inst != null) {
+                Class<?>[] allClasses = inst.getAllLoadedClasses();
+                sb.append(", totalClasses=").append(allClasses.length);
+
+                int bootstrapCount = 0;
+                int appClassLoaderCount = 0;
+                int spyClassLoaderCount = 0;
+                int otherClassLoaderCount = 0;
+
+                java.util.Map<String, Integer> loaderNameCounts = new java.util.LinkedHashMap<String, Integer>();
+
+                for (Class<?> clazz : allClasses) {
+                    ClassLoader loader = clazz.getClassLoader();
+                    if (loader == null) {
+                        bootstrapCount++;
+                    } else {
+                        String loaderName = loader.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(loader));
+                        Integer cnt = loaderNameCounts.get(loaderName);
+                        loaderNameCounts.put(loaderName, cnt == null ? 1 : cnt + 1);
+
+                        if (loader.getClass().getName().contains("SpyClassLoader")) {
+                            spyClassLoaderCount++;
+                        } else if (loader.getClass().getName().contains("AppClassLoader") || loader.getClass().getName().contains("LaunchedURLClassLoader")) {
+                            appClassLoaderCount++;
+                        } else {
+                            otherClassLoaderCount++;
+                        }
+                    }
+                }
+
+                sb.append(", bootstrap=").append(bootstrapCount);
+                sb.append(", app=").append(appClassLoaderCount);
+                sb.append(", spy=").append(spyClassLoaderCount);
+                sb.append(", other=").append(otherClassLoaderCount);
+
+                sb.append(", loaders=").append(loaderNameCounts);
+
+                // Check com.english classes
+                int englishCount = 0;
+                for (Class<?> clazz : allClasses) {
+                    if (clazz.getName().startsWith("com.english")) englishCount++;
+                }
+                sb.append(", englishClasses=").append(englishCount);
+            }
+
+            return new DataRet<String>(true, 0, sb.toString());
+        } catch (Exception e) {
+            return new DataRet<String>(false, -1, "error: " + e.getMessage());
+        }
+    }
+
     @TracerPath(value = "/invoke/classes.json", order = 4)
     public DataRet<List<ClassSearchVO>> classes(@TraceParam("prefix") String prefix) {
         if (prefix == null || prefix.isEmpty()) {

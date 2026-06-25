@@ -1,6 +1,7 @@
 package com.ali.trace.spy.jetty.handler;
 
 import com.ali.trace.spy.jetty.vo.DataRet;
+import com.ali.trace.spy.jetty.vo.StackTraceVO;
 import com.ali.trace.spy.jetty.vo.ThreadNodeVO;
 import com.ali.trace.spy.xml.XmlNode;
 
@@ -10,15 +11,22 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author nkhanlang@163.com
  */
 public class ThreadHandler implements ITraceHttpHandler {
+
+    private static final ConcurrentHashMap<Long, ThreadStackSampler> samplerMap = new ConcurrentHashMap<Long, ThreadStackSampler>();
+    private static final AtomicLong samplerIdSeq = new AtomicLong(0);
 
     @TracerPath(value = "/thread", order = 1)
     @TraceView
@@ -77,6 +85,118 @@ public class ThreadHandler implements ITraceHttpHandler {
         sortAndClean(result);
         ret.setData(result);
         return ret;
+    }
+
+    @TracerPath(value = "/thread/detail.json", order = 3)
+    public DataRet<List<StackTraceVO>> threadDetail(@TraceParam("id") String idStr) throws IOException {
+        DataRet<List<StackTraceVO>> ret;
+        long tid;
+        try {
+            tid = Long.parseLong(idStr);
+        } catch (NumberFormatException e) {
+            return new DataRet<List<StackTraceVO>>(false, 400, "invalid thread id: " + idStr);
+        }
+
+        Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
+        for (Entry<Thread, StackTraceElement[]> entry : stackTraces.entrySet()) {
+            Thread thread = entry.getKey();
+            if (thread.getId() == tid) {
+                StackTraceElement[] stacks = thread.getStackTrace();
+                List<StackTraceVO> result = new ArrayList<StackTraceVO>();
+                // Top-to-bottom order (most recent call first)
+                for (int i = 0; i < stacks.length; i++) {
+                    result.add(new StackTraceVO(stacks[i]));
+                }
+                ret = new DataRet<List<StackTraceVO>>(true, 0, "ok");
+                // Add thread info to the data
+                ret.setData(result);
+                return ret;
+            }
+        }
+        return new DataRet<List<StackTraceVO>>(false, 404, "thread not found: " + tid);
+    }
+
+    @TracerPath(value = "/thread/sampler/start.json", order = 3)
+    public DataRet<String> samplerStart(@TraceParam("ids") String idsStr) throws IOException {
+        Set<Long> threadIds = new HashSet<Long>();
+        if (idsStr != null && idsStr.length() > 0) {
+            String[] parts = idsStr.split(",");
+            for (String part : parts) {
+                try {
+                    threadIds.add(Long.parseLong(part.trim()));
+                } catch (NumberFormatException e) {
+                    // skip invalid IDs
+                }
+            }
+        }
+
+        if (threadIds.isEmpty()) {
+            return new DataRet<String>(false, 400, "no valid thread ids provided");
+        }
+
+        long samplerId = samplerIdSeq.incrementAndGet();
+        final ThreadStackSampler newSampler = new ThreadStackSampler(threadIds);
+        // Self-cleaning: when sampler thread finishes, remove from map so the object can be GC'd
+        newSampler.setOnComplete(new Runnable() {
+            public void run() {
+                samplerMap.remove(samplerId, newSampler);
+            }
+        });
+        samplerMap.put(samplerId, newSampler);
+        newSampler.start();
+        return new DataRet<String>(true, 0, "" + samplerId);
+    }
+
+    @TracerPath(value = "/thread/sampler/result.json", order = 4)
+    public DataRet<String> samplerResult(@TraceParam("sid") String sidStr, @TraceParam("ttl") String ttlStr, PrintWriter writer) throws IOException {
+        long sid;
+        try {
+            sid = Long.parseLong(sidStr);
+        } catch (NumberFormatException e) {
+            return new DataRet<String>(false, 400, "invalid sampler id");
+        }
+
+        ThreadStackSampler sampler = samplerMap.get(sid);
+        if (sampler == null) {
+            return new DataRet<String>(false, 404, "sampler not found or expired");
+        }
+
+        // Renew expiry with custom TTL (default 10 seconds)
+        int ttl = 10;
+        if (ttlStr != null && ttlStr.length() > 0) {
+            try {
+                ttl = Integer.parseInt(ttlStr.trim());
+                if (ttl < 1) ttl = 10;
+            } catch (NumberFormatException e) {
+                ttl = 10;
+            }
+        }
+        sampler.renewExpiry(ttl);
+
+        // Get result and build JSON response
+        ThreadStackSampler.SamplerResult result = sampler.getResult();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"status\":true,\"code\":0,\"msg\":\"ok\",\"data\":");
+        sb.append(result.toJson());
+        sb.append("}");
+        writer.write(sb.toString());
+        return null;
+    }
+
+    @TracerPath(value = "/thread/sampler/stop.json", order = 5)
+    public DataRet<String> samplerStop(@TraceParam("sid") String sidStr) throws IOException {
+        long sid;
+        try {
+            sid = Long.parseLong(sidStr);
+        } catch (NumberFormatException e) {
+            return new DataRet<String>(false, 400, "invalid sampler id");
+        }
+
+        ThreadStackSampler sampler = samplerMap.remove(sid);
+        if (sampler != null) {
+            sampler.stop();
+        }
+        return new DataRet<String>(true, 0, "sampler stopped");
     }
 
     private void sortAndClean(List<ThreadNodeVO> nodes) {

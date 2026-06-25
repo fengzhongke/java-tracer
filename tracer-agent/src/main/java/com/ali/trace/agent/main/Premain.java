@@ -367,6 +367,14 @@ public class Premain {
                     agentArgsBuilder.append(":").append("-sleep").append("=").append((String)params.get("-sleep"));
                 }
 
+                if (params.containsKey("-reload")) {
+                    agentArgsBuilder.append(":").append("-reload").append("=").append((String)params.get("-reload"));
+                }
+
+                if (params.containsKey("-retransform")) {
+                    agentArgsBuilder.append(":").append("-retransform").append("=").append((String)params.get("-retransform"));
+                }
+
                 String agentArgs = agentArgsBuilder.toString();
                 boolean attached = false;
                 if (jdkMajorVersion >= 9) {
@@ -393,8 +401,12 @@ public class Premain {
                         System.out.println("JDK Attach API failed: " + (cause != null ? cause.getClass().getName() + ": " + cause.getMessage() : e.getMessage()));
                     } catch (ClassNotFoundException var24) {
                         System.out.println("JDK Attach API module not available, trying tool JAR...");
+                    } catch (UnsatisfiedLinkError e) {
+                        System.out.println("JDK Attach API native library not found (" + e.getMessage() + "), trying tool JAR...");
                     } catch (Exception e) {
                         System.out.println("JDK Attach API failed: " + e.getMessage());
+                    } catch (Throwable e) {
+                        System.out.println("JDK Attach API failed with error: " + e.getClass().getName() + ": " + e.getMessage());
                     }
                 }
 
@@ -494,6 +506,13 @@ public class Premain {
                 command.add("--add-opens");
                 command.add("java.base/sun.nio.ch=ALL-UNNAMED");
                 command.add("-Dtracer.attach.reexeced=true");
+                // Add cwd to java.library.path so extracted native libs (e.g. libattach.so) can be found
+                // by System.loadLibrary("attach") in VirtualMachineImpl — the bundled tool JAR does not
+                // use the "attach.lib.path" system property, so the native lib must be on java.library.path
+                String currentLibPath = System.getProperty("java.library.path");
+                String cwd = System.getProperty("user.dir");
+                String newLibPath = currentLibPath + File.pathSeparator + cwd;
+                command.add("-Djava.library.path=" + newLibPath);
                 command.add("-jar");
                 command.add(getJarFilePath());
 
@@ -502,8 +521,10 @@ public class Premain {
                 }
 
                 System.out.println("JDK " + jdkMajor + " detected, re-executing with module access flags..." + (hasJdkAttach ? " (jdk.attach module available)" : " (jdk.attach module not found, will use bundled tool JAR)"));
+                System.out.println("Added cwd to java.library.path: " + newLibPath);
                 ProcessBuilder pb = new ProcessBuilder(command);
                 pb.inheritIO();
+                pb.directory(new File(cwd));
                 Process process = pb.start();
                 int exitCode = process.waitFor();
                 System.exit(exitCode);

@@ -16,6 +16,7 @@ public class ThreadNodeVO {
     private String className;
     private int lineNumber;
     private int count;              // count of threads/frames at this node
+    private double cpuPct;          // CPU usage percentage (thread leaf only)
     private boolean isFrame;        // true if this is a stack frame node
     private boolean isThread;       // true if this is a thread leaf node
     private List<ThreadNodeVO> children = new ArrayList<ThreadNodeVO>();
@@ -83,6 +84,14 @@ public class ThreadNodeVO {
         this.count++;
     }
 
+    public double getCpuPct() {
+        return cpuPct;
+    }
+
+    public void setCpuPct(double cpuPct) {
+        this.cpuPct = cpuPct;
+    }
+
     public boolean isFrame() {
         return isFrame;
     }
@@ -146,6 +155,9 @@ public class ThreadNodeVO {
         sb.append(",\"count\":").append(count);
         sb.append(",\"isFrame\":").append(isFrame);
         sb.append(",\"isThread\":").append(isThread);
+        if (isThread) {
+            sb.append(",\"cpuPct\":").append(String.format("%.1f", cpuPct));
+        }
         if (isFrame && !isThread) {
             sb.append(",\"fullName\":\"").append(escapeJson(fullName != null ? fullName : name)).append("\"");
             if (className != null) {
