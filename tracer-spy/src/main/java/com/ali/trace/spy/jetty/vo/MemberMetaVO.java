@@ -10,6 +10,7 @@ public class MemberMetaVO {
     private String name;            // method name or field name
     private String returnType;     // return type simple name (method return type or field type)
     private String[] paramTypes;   // method parameter type simple names (empty array for fields)
+    private String[] paramTypeFqns; // method parameter type fully qualified names (using Class.getName())
     private boolean isStatic;      // true for static methods/fields
     private boolean isField;       // true=field, false=method
     private String declaringClass; // simple name of the declaring class
@@ -24,6 +25,9 @@ public class MemberMetaVO {
 
     public String[] getParamTypes() { return paramTypes; }
     public void setParamTypes(String[] paramTypes) { this.paramTypes = paramTypes; }
+
+    public String[] getParamTypeFqns() { return paramTypeFqns; }
+    public void setParamTypeFqns(String[] paramTypeFqns) { this.paramTypeFqns = paramTypeFqns; }
 
     public boolean isStatic() { return isStatic; }
     public void setStatic(boolean isStatic) { this.isStatic = isStatic; }
@@ -49,6 +53,16 @@ public class MemberMetaVO {
             sb.append("]");
         } else {
             sb.append(",\"paramTypes\":[]");
+        }
+        if (paramTypeFqns != null && paramTypeFqns.length > 0) {
+            sb.append(",\"paramTypeFqns\":[");
+            for (int i = 0; i < paramTypeFqns.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"").append(escapeJson(paramTypeFqns[i])).append("\"");
+            }
+            sb.append("]");
+        } else {
+            sb.append(",\"paramTypeFqns\":[]");
         }
         sb.append(",\"isStatic\":").append(isStatic);
         sb.append(",\"isField\":").append(isField);

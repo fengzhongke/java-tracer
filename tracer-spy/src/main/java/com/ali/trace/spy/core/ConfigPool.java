@@ -1,6 +1,7 @@
 package com.ali.trace.spy.core;
 
 import com.ali.trace.spy.inject.TraceInjector;
+import com.ali.trace.spy.interceptor.BaseInterceptor;
 import com.ali.trace.spy.interceptor.IInterceptor;
 
 import org.apache.commons.lang.StringUtils;
@@ -8,6 +9,8 @@ import org.apache.commons.lang.StringUtils;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
@@ -37,6 +40,11 @@ public class ConfigPool {
     private volatile String redefineName;
     private EmptyTransformer emptyTransformer = new EmptyTransformer();
 
+    // Param capture weave target — stores the precise Executable (Method or Constructor)
+    // instead of imprecise className + methodName strings.
+    // All derived values (class name, method name, descriptor) come from this object.
+    private volatile Executable paramCaptureTarget;
+
     // Retransform progress tracking
     private volatile int progressTotal = 0;
     private volatile int progressDone = 0;
@@ -51,6 +59,7 @@ public class ConfigPool {
      * Clear all data (for hot reload)
      */
     public void clear() {
+        clearParamCaptureTarget();
         loaderSets.clear();
         loaderIdMap.clear();
         weaveClass = null;
@@ -163,6 +172,16 @@ public class ConfigPool {
 
     public Instrumentation getInst() {
         return inst;
+    }
+
+    public void setRedefine(ClassLoader loader, String name) {
+        this.redefineLoader = loader;
+        this.redefineName = name;
+    }
+
+    public void clearRedefine() {
+        this.redefineLoader = null;
+        this.redefineName = null;
     }
 
     public boolean isRedefine(ClassLoader loader, String name){
@@ -414,6 +433,38 @@ public class ConfigPool {
     public void setWeaveClass(Class<?> weaveClass) {
         if (weaveClass != null) {
             this.weaveClass = weaveClass;
+            // Ensure SET_PARAMS in TraceEnhance is initialized.
+            // This may fail in TraceInjector's constructor due to class-loading timing,
+            // but by the time setWeaveClass is called, all spy classes are fully loaded.
+            initSetParamsMethod(weaveClass);
+        }
+    }
+
+    private void initSetParamsMethod(Class<?> weaveClass) {
+        try {
+            java.lang.reflect.Field setParamsField = weaveClass.getDeclaredField("SET_PARAMS");
+            setParamsField.setAccessible(true);
+            Object currentValue = setParamsField.get(null);
+            // Check if SET_PARAMS is already set AND its declaring class matches current BaseInterceptor
+            if (currentValue != null) {
+                java.lang.reflect.Method currentMethod = (java.lang.reflect.Method) currentValue;
+                if (currentMethod.getDeclaringClass() == BaseInterceptor.class) {
+                    return; // already initialized with correct classloader
+                }
+                // Stale SET_PARAMS from a previous SpyClassLoader — reinitialize
+                System.out.println("[tracer] SET_PARAMS stale (declaringClass.loader="
+                    + currentMethod.getDeclaringClass().getClassLoader()
+                    + ", current BaseInterceptor.loader=" + BaseInterceptor.class.getClassLoader()
+                    + ") — reinitializing");
+            }
+            // Initialize SET_PARAMS with current BaseInterceptor.class
+            java.lang.reflect.Method targetMethod = BaseInterceptor.class.getMethod("setParams", Object[].class);
+            java.lang.reflect.Method setParamsMethodOnWeave = weaveClass.getDeclaredMethod("setParamsMethod", java.lang.reflect.Method.class);
+            setParamsMethodOnWeave.invoke(null, targetMethod);
+            System.out.println("[tracer] SET_PARAMS initialized: " + targetMethod);
+        } catch (Throwable e) {
+            System.out.println("[tracer] initSetParamsMethod failed: " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -458,6 +509,138 @@ public class ConfigPool {
             }
         }
         return interceptor;
+    }
+
+    // ========== Param Capture Weave Target ==========
+
+    /**
+     * Set the param capture target using a precise Executable (Method or Constructor).
+     * This replaces the old className+methodName approach, enabling exact matching
+     * of overloaded methods and correct inner class handling.
+     */
+    public void setParamCaptureTarget(Executable target) {
+        // Remove include prefix for old target
+        String oldInternalName = getParamCaptureInternalClassName();
+        if (oldInternalName != null && injector != null) {
+            injector.removeIncludePrefix(oldInternalName);
+            // Also remove dot-format prefix if it was previously added in error
+            injector.removeIncludePrefix(oldInternalName.replace('/', '.').replaceAll("\\$", "."));
+        }
+        this.paramCaptureTarget = target;
+        // Compute internal name from Executable (preserves $ signs correctly)
+        String newInternalName = getParamCaptureInternalClassName();
+        if (newInternalName != null && injector != null) {
+            injector.addIncludePrefix(newInternalName);
+        }
+    }
+
+    /**
+     * Backward compatibility: set param capture target by className + methodName only.
+     * This is imprecise for overloaded methods — use setParamCaptureTarget(Executable) instead.
+     * Resolves by finding the class across loaded classloaders, then picking the first method
+     * with the matching name.
+     */
+    public void setParamCaptureTarget(String className, String methodName) {
+        String dotName = className != null ? className.replace('/', '.') : null;
+        Class<?> clazz = null;
+        Instrumentation localInst = inst;
+        if (localInst != null && dotName != null) {
+            for (Class<?> c : localInst.getAllLoadedClasses()) {
+                if (c.getName().equals(dotName)) { clazz = c; break; }
+            }
+        }
+        if (clazz == null) {
+            // Try Class.forName
+            try { clazz = Class.forName(dotName, true, Thread.currentThread().getContextClassLoader()); }
+            catch (ClassNotFoundException e1) { try { clazz = Class.forName(dotName); } catch (ClassNotFoundException e2) {} }
+        }
+        if (clazz == null) return;
+
+        Executable target = null;
+        String originalName = methodName;
+        // Handle sanitized constructor name
+        if ("_init_".equals(originalName) || "<init>".equals(originalName)) {
+            try { target = clazz.getDeclaredConstructors()[0]; } catch (Exception e) {}
+        } else {
+            // Pick first method with matching name (imprecise for overloaded methods!)
+            for (Method m : clazz.getDeclaredMethods()) {
+                if (m.getName().equals(originalName)) { target = m; break; }
+            }
+            if (target == null) {
+                // Walk superclass chain
+                Class<?> current = clazz.getSuperclass();
+                while (current != null && target == null) {
+                    for (Method m : current.getDeclaredMethods()) {
+                        if (m.getName().equals(originalName)) { target = m; break; }
+                    }
+                    current = current.getSuperclass();
+                }
+            }
+        }
+        if (target != null) {
+            System.out.println("[tracer] WARNING: setParamCaptureTarget(String,String) is imprecise for overloaded methods. Consider using setParamCaptureTarget(Executable) instead.");
+            setParamCaptureTarget(target);
+        }
+    }
+
+    public void clearParamCaptureTarget() {
+        // Remove include prefix for the old target
+        String oldInternalName = getParamCaptureInternalClassName();
+        if (oldInternalName != null && injector != null) {
+            injector.removeIncludePrefix(oldInternalName);
+            injector.removeIncludePrefix(oldInternalName.replace('/', '.').replaceAll("\\$", "."));
+        }
+        this.paramCaptureTarget = null;
+    }
+
+    /** Returns the stored Executable (Method or Constructor) directly. */
+    public Executable getParamCaptureTarget() {
+        return paramCaptureTarget;
+    }
+
+    /** JVM internal class name (slash format, preserving $ signs) e.g. "com/example/Outer$Inner" */
+    public String getParamCaptureInternalClassName() {
+        if (paramCaptureTarget == null) return null;
+        return paramCaptureTarget.getDeclaringClass().getName().replace('.', '/');
+    }
+
+    /** Dot-format class name for display e.g. "com.example.Outer.Inner" */
+    public String getParamCaptureDotClassName() {
+        if (paramCaptureTarget == null) return null;
+        return paramCaptureTarget.getDeclaringClass().getName();
+    }
+
+    /** Original (unsanitized) method/constructor name e.g. "<init>" or "foo" */
+    public String getParamCaptureMethodName() {
+        if (paramCaptureTarget == null) return null;
+        return paramCaptureTarget.getName();
+    }
+
+    /** ASM method descriptor e.g. "(Ljava/lang/String;I)V" — computed from the Executable */
+    public String getParamCaptureDescriptor() {
+        if (paramCaptureTarget == null) return null;
+        if (paramCaptureTarget instanceof Method) {
+            return org.objectweb.asm.Type.getMethodDescriptor((Method) paramCaptureTarget);
+        } else if (paramCaptureTarget instanceof Constructor) {
+            return org.objectweb.asm.Type.getConstructorDescriptor((Constructor) paramCaptureTarget);
+        }
+        return null;
+    }
+
+    /** Fully qualified parameter type names using Class.getName() */
+    public String[] getParamCaptureParamTypeNames() {
+        if (paramCaptureTarget == null) return null;
+        Class<?>[] paramTypes = paramCaptureTarget.getParameterTypes();
+        String[] names = new String[paramTypes.length];
+        for (int i = 0; i < paramTypes.length; i++) {
+            names[i] = paramTypes[i].getName();
+        }
+        return names;
+    }
+
+    /** Whether the captured target is a constructor */
+    public boolean isParamCaptureConstructor() {
+        return paramCaptureTarget instanceof Constructor;
     }
 
     public class LoaderSet {

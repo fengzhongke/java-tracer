@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.ali.trace.spy.helper.IFileNameGenerator;
 import com.ali.trace.spy.helper.ThreadFileNameGenerator;
@@ -15,6 +16,8 @@ import com.ali.trace.spy.helper.ThreadFileNameGenerator;
  *
  */
 public abstract class BaseInterceptor implements IInterceptor {
+
+    private static final AtomicReference<Object[]> interceptParams = new AtomicReference<>();
     private final String path;
     private final ThreadLocal<Writer> t_outs = new ThreadLocal<Writer>();
     private IFileNameGenerator nameGenerator;
@@ -55,4 +58,11 @@ public abstract class BaseInterceptor implements IInterceptor {
         return out;
     }
 
+    public static void setParams(Object[] params) {
+        interceptParams.set(params);
+    }
+
+    public static Object[] getParams() {
+        return interceptParams.get();
+    }
 }

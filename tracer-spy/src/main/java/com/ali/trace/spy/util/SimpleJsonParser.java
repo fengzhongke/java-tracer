@@ -17,12 +17,40 @@ public class SimpleJsonParser {
 
     /**
      * Parse a JSON string into a MethodCallNode tree.
+     * Supports two formats:
+     * 1. Flat chain array: { "chain": [node0, node1, node2, ...] }
+     *    where node0 is the innermost call, node1 uses node0's result, etc.
+     *    The parser links targets: chain[i].target = chain[i-1] for i > 0
+     * 2. Target-linked tree (legacy): { className, methodName, target: { ... } }
+     *    the old nested format — still supported for backward compatibility.
      */
     public static MethodCallNode parseMethodCallNode(String json) {
         if (json == null || json.trim().isEmpty()) {
             return null;
         }
         json = json.trim();
+
+        // Check for flat chain format first: { "chain": [...] }
+        String chainJson = extractObjectOrArray(json.substring(1, json.length() - 1).trim(), "chain");
+        // Also try without stripping braces (the top-level JSON)
+        if (chainJson == null) {
+            // Try on the full json string — extractObjectOrArray skips to the key inside the outer braces
+            String innerContent = json.startsWith("{") ? json.substring(1, json.length() - 1).trim() : json;
+            chainJson = extractObjectOrArray(innerContent, "chain");
+        }
+        if (chainJson != null && chainJson.startsWith("[") && chainJson.endsWith("]")) {
+            List<MethodCallNode> chain = parseNodeArray(chainJson);
+            if (chain != null && !chain.isEmpty()) {
+                // Link targets: chain[i].target = chain[i-1]
+                for (int i = 1; i < chain.size(); i++) {
+                    chain.get(i).setTarget(chain.get(i - 1));
+                    // isStatic is determined by InvokeEngine at runtime based on method modifiers
+                }
+                return chain.get(chain.size() - 1);  // last = outermost = root
+            }
+        }
+
+        // Fall back to target-linked tree parsing (legacy format)
         return parseNode(json);
     }
 
@@ -110,6 +138,30 @@ public class SimpleJsonParser {
         String callType = extractStringValue(content, "callType");
         if (callType != null && !callType.isEmpty()) {
             node.setCallType(callType);
+        }
+
+        // Extract realReturnType (response field, runtime class name)
+        String realReturnType = extractStringValue(content, "realReturnType");
+        if (realReturnType != null) {
+            node.setRealReturnType(realReturnType);
+        }
+
+        // Extract capturedValue (for capturedRef nodes)
+        String capturedValue = extractStringValue(content, "capturedValue");
+        if (capturedValue != null) {
+            node.setCapturedValue(capturedValue);
+        }
+
+        // Extract capturedParamIndex (for capturedRef nodes)
+        String capturedParamIndexStr = extractStringValue(content, "capturedParamIndex");
+        if (capturedParamIndexStr != null) {
+            try { node.setCapturedParamIndex(Integer.parseInt(capturedParamIndexStr)); } catch (NumberFormatException e) { /* ignore */ }
+        }
+
+        // Extract arrayLength (for array/collection results)
+        String arrayLengthStr = extractStringValue(content, "arrayLength");
+        if (arrayLengthStr != null) {
+            try { node.setArrayLength(Integer.parseInt(arrayLengthStr)); } catch (NumberFormatException e) { /* ignore */ }
         }
 
         // Extract paramTypes (string array)

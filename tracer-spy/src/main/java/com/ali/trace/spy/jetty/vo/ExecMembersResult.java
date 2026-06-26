@@ -10,14 +10,14 @@ import java.util.List;
  */
 public class ExecMembersResult {
 
-    private MethodCallNode invokeResult;
+    private List<MethodCallNode> invokeResult;
     private String runtimeClassName;
     private List<MemberMetaVO> members;
 
     public ExecMembersResult() {}
 
-    public MethodCallNode getInvokeResult() { return invokeResult; }
-    public void setInvokeResult(MethodCallNode invokeResult) { this.invokeResult = invokeResult; }
+    public List<MethodCallNode> getInvokeResult() { return invokeResult; }
+    public void setInvokeResult(List<MethodCallNode> invokeResult) { this.invokeResult = invokeResult; }
 
     public String getRuntimeClassName() { return runtimeClassName; }
     public void setRuntimeClassName(String runtimeClassName) { this.runtimeClassName = runtimeClassName; }
@@ -29,7 +29,17 @@ public class ExecMembersResult {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
-        sb.append("\"invokeResult\":").append(invokeResult != null ? invokeResult.toString() : "null");
+        sb.append("\"invokeResult\":");
+        if (invokeResult != null && !invokeResult.isEmpty()) {
+            sb.append("[");
+            for (int i = 0; i < invokeResult.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(invokeResult.get(i).toString());
+            }
+            sb.append("]");
+        } else {
+            sb.append("[]");
+        }
         sb.append(",\"runtimeClassName\":\"").append(escapeJson(runtimeClassName)).append("\"");
         sb.append(",\"members\":");
         if (members != null && !members.isEmpty()) {

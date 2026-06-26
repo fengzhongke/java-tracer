@@ -9,6 +9,7 @@ public class MethodMetaVO {
     private String name;            // method name
     private String returnType;      // simple name of return type
     private String[] paramTypes;    // simple names of parameter types
+    private String[] paramTypeFqns; // fully qualified names of parameter types (using Class.getName())
     private boolean isStatic;       // whether the method is static
     private String declaringClass;  // simple name of the declaring class
 
@@ -22,6 +23,9 @@ public class MethodMetaVO {
 
     public String[] getParamTypes() { return paramTypes; }
     public void setParamTypes(String[] paramTypes) { this.paramTypes = paramTypes; }
+
+    public String[] getParamTypeFqns() { return paramTypeFqns; }
+    public void setParamTypeFqns(String[] paramTypeFqns) { this.paramTypeFqns = paramTypeFqns; }
 
     public boolean isStatic() { return isStatic; }
     public void setStatic(boolean isStatic) { this.isStatic = isStatic; }
@@ -44,6 +48,16 @@ public class MethodMetaVO {
             sb.append("]");
         } else {
             sb.append(",\"paramTypes\":[]");
+        }
+        if (paramTypeFqns != null && paramTypeFqns.length > 0) {
+            sb.append(",\"paramTypeFqns\":[");
+            for (int i = 0; i < paramTypeFqns.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append("\"").append(escapeJson(paramTypeFqns[i])).append("\"");
+            }
+            sb.append("]");
+        } else {
+            sb.append(",\"paramTypeFqns\":[]");
         }
         sb.append(",\"isStatic\":").append(isStatic);
         sb.append(",\"declaringClass\":\"").append(escapeJson(declaringClass)).append("\"");

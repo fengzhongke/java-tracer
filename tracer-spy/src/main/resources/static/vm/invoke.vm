@@ -24,6 +24,7 @@
         .chain-step.step-classref { border-left: 3px solid #31708f; }
         .chain-step.step-static { border-left: 3px solid #3c763d; }
         .chain-step.step-arrayget { border-left: 3px solid #2e7d32; }
+        .chain-step.step-capturedref { border-left: 3px solid #f0ad4e; }
 
         /* Step number */
         .step-num {
@@ -51,6 +52,8 @@
         .type-badge.badge-classref:hover { background: #bde0f2; }
         .type-badge.badge-arrayget { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 11px; }
         .type-badge.badge-arrayget:hover { background: #c8e6c9; }
+        .type-badge.badge-capturedref { background: #fcf8e3; color: #8a6d3b; cursor: pointer; }
+        .type-badge.badge-capturedref:hover { background: #f5e6c8; }
         .step-name { font-weight: bold; color: #31708f; font-size: 13px; }
 
         /* Step params (inline) */
@@ -90,6 +93,7 @@
         .step-name .ret-duration { color: #999; font-size: 11px; }
         .step-name .ret-error { color: #a94442; font-size: 12px; }
         .step-name .ret-cascade { color: #8a6d3b; font-size: 12px; font-style: italic; }
+        .ret-length { color: #2e7d32; font-size: 11px; font-weight: bold; }
 
         /* Step actions */
         .step-actions {
@@ -191,6 +195,29 @@
             <h4 class="list-group-item-heading">Invoke Chain</h4>
         </a>
 
+        <!-- Weave section — compact status bar -->
+        <div class="list-group-item" id="weave_section">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <h5 style="margin:0;font-weight:bold;">Weave</h5>
+                <span id="weave_status" style="color:#999;font-size:12px;">No weave target set</span>
+                <div class="btn-group">
+                    <button class="btn btn-primary btn-sm" onclick="showWeaveModal()">
+                        <span class="glyphicon glyphicon-wrench"></span> Set
+                    </button>
+                    <button class="btn btn-warning btn-sm" id="unweave_btn" onclick="unweaveMethod()" style="display:none;">
+                        <span class="glyphicon glyphicon-remove"></span> Unweave
+                    </button>
+                    <button class="btn btn-info btn-sm" onclick="refreshCapturedParams()">
+                        <span class="glyphicon glyphicon-refresh"></span> Params
+                    </button>
+                    <button class="btn btn-success btn-sm" id="use_params_btn" onclick="useCapturedParamsAsInvoke()" style="display:none;">
+                        <span class="glyphicon glyphicon-play"></span> Invoke
+                    </button>
+                </div>
+            </div>
+            <div id="weave_captured_params" style="margin-top:6px;font-size:12px;color:#666;"></div>
+        </div>
+
         <!-- Chain area -->
         <div class="list-group-item" id="chain_area">
             <div id="chain_container"></div>
@@ -213,6 +240,11 @@
                 <button class="btn btn-default" onclick="openJsonEditor()">
                     <span class="glyphicon glyphicon-code"></span> JSON
                 </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+                <span style="color:#999;font-size:12px;">Max display length:</span>
+                <input type="number" id="max_display_len" class="form-control input-sm" style="width:80px;" value="500" min="60" max="10000" onchange="updateMaxDisplayLen(this.value)">
+                <span style="color:#999;font-size:11px;">(exceptions, return values)</span>
             </div>
         </div>
 
@@ -258,6 +290,46 @@
     </div>
 </div>
 
+<!-- Weave Modal -->
+<div class="modal fade" id="weave_modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title">Weave (Param Capture)</h4>
+            </div>
+            <div class="modal-body">
+                <!-- Phase 1: Class search -->
+                <div id="weave_phase_class">
+                    <div class="ms-search-bar">
+                        <span id="weave_class_label" class="ms-class-label">Search a class first</span>
+                        <button class="btn btn-default btn-xs ms-change-btn" onclick="weaveShowClassSearch()" id="weave_change_class_btn" style="display:none;">
+                            <span class="glyphicon glyphicon-search"></span> Change
+                        </button>
+                    </div>
+                    <div id="weave_class_search_area">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="weave_class_search_input" placeholder="Search class name...">
+                            <span class="input-group-btn">
+                                <button class="btn btn-primary" onclick="weaveSearchClasses()"><span class="glyphicon glyphicon-search"></span></button>
+                            </span>
+                        </div>
+                        <div id="weave_class_list" class="class-list"></div>
+                    </div>
+                </div>
+                <!-- Phase 2: Method selection -->
+                <div id="weave_method_list" class="member-list" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" id="weave_btn" onclick="weaveMethod()" style="display:none;">
+                    <span class="glyphicon glyphicon-wrench"></span> Weave
+                </button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- JSON Editor modal -->
 <div class="modal fade" id="json_modal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -280,5 +352,5 @@
     </div>
 </div>
 
-<script src="/static/js/invoke.js?v=2"></script>
+<script src="/static/js/invoke.js?v=6"></script>
 </body>

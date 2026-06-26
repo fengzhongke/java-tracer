@@ -2,6 +2,7 @@ package com.ali.trace.spy.invoke;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.ConfigPool.LoaderSet;
+import com.ali.trace.spy.interceptor.BaseInterceptor;
 import com.ali.trace.spy.jetty.vo.MethodCallNode;
 
 import java.lang.instrument.Instrumentation;
@@ -23,8 +24,16 @@ import java.util.Set;
 public class InvokeEngine {
 
     private static final InvokeEngine INSTANCE = new InvokeEngine();
-    private static final int MAX_VALUE_LEN = 200;
+    private static int maxValueLen = 2000;  // max display length for return values (configurable)
     private static final int MAX_DEPTH = 20;
+
+    public static void setMaxValueLen(int len) {
+        if (len > 0) maxValueLen = len;
+    }
+
+    public static int getMaxValueLen() {
+        return maxValueLen;
+    }
 
     public static InvokeEngine getInstance() {
         return INSTANCE;
@@ -47,6 +56,16 @@ public class InvokeEngine {
 
         // --- Literal node --- (no recursion, safe to resolve regardless of depth)
         if (node.isLiteral()) {
+            if (node.resolvedValue != null) {
+                // Already resolved (e.g. captured param from weaved method) — use directly
+                node.setReturnValue(node.getValue());
+                node.setReturnType(node.getValueType());
+                node.setRealReturnType(node.resolvedValue.getClass().getName());
+                node.setVoid(false);
+                node.setDuration(0);
+                node.setException(null);
+                return node;
+            }
             Object resolved = resolveLiteral(node.getValue(), node.getValueType());
             node.resolvedValue = resolved;
             node.setReturnValue(node.getValue());
@@ -58,12 +77,66 @@ public class InvokeEngine {
             return node;
         }
 
+        // --- Captured reference node --- (pre-resolved object from param capture weave)
+        // When callType is "capturedRef", this node represents a pre-resolved Java object
+        // captured from the weaved method's parameters. resolvedValue may be set on the server
+        // side before invoking (from exec-weaved endpoint), or null when sent from the frontend.
+        // When resolvedValue is null, the invoke engine resolves it from BaseInterceptor.getParams()
+        // using the capturedParamIndex field.
+        if (node.isCapturedRef()) {
+            if (node.resolvedValue != null) {
+                // Server-side pre-resolved (from exec-weaved endpoint)
+                node.setReturnType(node.resolvedValue.getClass().getSimpleName());
+                node.setRealReturnType(node.resolvedValue.getClass().getName());
+                node.setReturnValue(node.getCapturedValue() != null ? node.getCapturedValue() : formatResult(node.resolvedValue));
+                node.setVoid(false);
+                node.setDuration(0);
+                node.setException(null);
+                // Set arrayLength if the captured object is an array or collection
+                setResultArrayLength(node, node.resolvedValue);
+            } else {
+                // Frontend-originated capturedRef — resolve from BaseInterceptor captured params
+                Object[] captured = BaseInterceptor.getParams();
+                int idx = node.getCapturedParamIndex();
+                if (captured != null && idx >= 0 && idx < captured.length && captured[idx] != null) {
+                    node.resolvedValue = captured[idx];
+                    node.setReturnType(captured[idx].getClass().getSimpleName());
+                    node.setRealReturnType(captured[idx].getClass().getName());
+                    node.setReturnValue(formatResult(captured[idx]));
+                    node.setVoid(false);
+                    node.setDuration(0);
+                    node.setException(null);
+                    setResultArrayLength(node, captured[idx]);
+                } else {
+                    node.setException("capturedRef: no captured params available (call the weaved method first)");
+                    node.setDuration(0);
+                    node.resolvedValue = null;
+                }
+            }
+            return node;
+        }
+
         // --- className-only node (Class.forName) --- (no recursion, safe to resolve regardless of depth)
         // When className is provided but methodName is empty/null,
         // resolve the class directly and return the Class<?> object.
         // This is useful when a parameter needs a Class object (e.g. getBean(Class)).
+        // If resolvedValue is already set (e.g. by exec-weaved endpoint), skip re-resolution
+        // and use the existing value directly.
+        // NOTE: capturedRef nodes also have className set and methodName empty, so
+        // they must be handled BEFORE this block to avoid mis-identification.
         if (node.getClassName() != null && !node.getClassName().isEmpty()
-            && (node.getMethodName() == null || node.getMethodName().isEmpty())) {
+            && (node.getMethodName() == null || node.getMethodName().isEmpty())
+            && !node.isCapturedRef()) {
+            if (node.resolvedValue != null) {
+                // Already resolved (e.g. captured receiver from weaved method) — use directly
+                node.setReturnType(node.resolvedValue.getClass().getSimpleName());
+                node.setRealReturnType(node.resolvedValue.getClass().getName());
+                node.setReturnValue(String.valueOf(node.resolvedValue));
+                node.setVoid(false);
+                node.setDuration(0);
+                node.setException(null);
+                return node;
+            }
             Class<?> clazz = findClass(node.getClassName(), node.getLoaderId());
             if (clazz == null) {
                 node.setException("class not found: " + node.getClassName());
@@ -155,6 +228,7 @@ public class InvokeEngine {
                 node.setVoid(false);
                 node.setDuration(elapsed);
                 node.setException(null);
+                setResultArrayLength(node, result);
 
             } catch (Throwable e) {
                 long elapsed = System.currentTimeMillis() - start;
@@ -246,6 +320,7 @@ public class InvokeEngine {
                 node.setVoid(false);
                 node.setDuration(elapsed);
                 node.setException(null);
+                setResultArrayLength(node, result);
 
             } catch (ArrayIndexOutOfBoundsException e) {
                 long elapsed = System.currentTimeMillis() - start;
@@ -377,6 +452,7 @@ public class InvokeEngine {
             node.resolvedValue = result;
             node.setDuration(elapsed);
             node.setException(null);
+            setResultArrayLength(node, result);
 
         } catch (InvocationTargetException e) {
             long elapsed = System.currentTimeMillis() - start;
@@ -393,6 +469,19 @@ public class InvokeEngine {
         }
 
         return node;
+    }
+
+    /**
+     * Set arrayLength on a node if the result is an array or Collection.
+     */
+    private void setResultArrayLength(MethodCallNode node, Object result) {
+        if (result != null) {
+            if (result.getClass().isArray()) {
+                node.setArrayLength(java.lang.reflect.Array.getLength(result));
+            } else if (result instanceof java.util.Collection) {
+                node.setArrayLength(((java.util.Collection<?>) result).size());
+            }
+        }
     }
 
     // =============================================
@@ -717,8 +806,9 @@ public class InvokeEngine {
     /**
      * Resolve a parameter type name to a Class<?> object.
      * Handles primitive type names, common wrapper names, and full qualified class names.
+     * Public static so it can be used by InvokeHandler.weave() for param type resolution.
      */
-    private Class<?> resolveParamClass(String typeName) {
+    public static Class<?> resolveParamClass(String typeName) {
         if (typeName == null || typeName.isEmpty()) return null;
 
         // Primitive types
@@ -749,8 +839,8 @@ public class InvokeEngine {
             case "Class":       return Class.class;
         }
 
-        // Full qualified class name — find across classloaders
-        return findClass(typeName);
+        // Full qualified class name — find across classloaders (needs instance)
+        return getInstance().findClass(typeName);
     }
 
     // =============================================
@@ -808,17 +898,17 @@ public class InvokeEngine {
     /**
      * Format a method invocation return value for display.
      * Handles null, String, primitives, arrays, collections, maps, and arbitrary objects.
-     * Truncates to MAX_VALUE_LEN characters.
+     * Truncates to maxValueLen characters.
      */
-    private String formatResult(Object result) {
+    public String formatResult(Object result) {
         if (result == null) {
             return "null";
         }
         // String — show quoted value, truncated
         if (result instanceof String) {
             String s = (String) result;
-            if (s.length() > MAX_VALUE_LEN) {
-                s = s.substring(0, MAX_VALUE_LEN) + "...";
+            if (s.length() > maxValueLen) {
+                s = s.substring(0, maxValueLen) + "...";
             }
             return "\"" + s + "\"";
         }
@@ -852,24 +942,24 @@ public class InvokeEngine {
             } else {
                 s = result.toString();
             }
-            if (s.length() > MAX_VALUE_LEN) {
-                s = s.substring(0, MAX_VALUE_LEN) + "...";
+            if (s.length() > maxValueLen) {
+                s = s.substring(0, maxValueLen) + "...";
             }
             return s;
         }
         // Collection — show size + truncated toString
         if (result instanceof java.util.Collection) {
             String s = "size=" + ((java.util.Collection) result).size() + ", " + result.toString();
-            if (s.length() > MAX_VALUE_LEN) {
-                s = s.substring(0, MAX_VALUE_LEN) + "...";
+            if (s.length() > maxValueLen) {
+                s = s.substring(0, maxValueLen) + "...";
             }
             return s;
         }
         // Map — show size + truncated toString
         if (result instanceof java.util.Map) {
             String s = "size=" + ((java.util.Map) result).size() + ", " + result.toString();
-            if (s.length() > MAX_VALUE_LEN) {
-                s = s.substring(0, MAX_VALUE_LEN) + "...";
+            if (s.length() > maxValueLen) {
+                s = s.substring(0, maxValueLen) + "...";
             }
             return s;
         }
@@ -881,8 +971,8 @@ public class InvokeEngine {
             // toString() can throw — use safe fallback
             s = result.getClass().getName() + "@" + Integer.toHexString(result.hashCode());
         }
-        if (s.length() > MAX_VALUE_LEN) {
-            s = s.substring(0, MAX_VALUE_LEN) + "...";
+        if (s.length() > maxValueLen) {
+            s = s.substring(0, maxValueLen) + "...";
         }
         return s;
     }

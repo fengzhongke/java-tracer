@@ -26,10 +26,17 @@ public class MethodCallNode {
     private String valueType;       // literal type (e.g. "int", "String", "null")
 
     // --- Call type field ---
-    private String callType;        // "method", "field", "classRef", "literal", "arrayGet" (default "method")
+    private String callType;        // "method", "field", "classRef", "capturedRef", "arrayLength", "literal", "arrayGet" (default "method")
 
     // --- Array/List index access field (used when callType is "arrayGet") ---
     private int index = -1;         // array/list index (e.g. 0, 1, 2...); -1 means not set
+
+    // --- Captured reference fields (used when callType is "capturedRef") ---
+    private String capturedValue;   // toString of the captured object (for display, truncated)
+    private int capturedParamIndex = -1; // index in BaseInterceptor.getParams() array (0=receiver, 1+=method args); -1 means not set
+
+    // --- Array/Collection length field (response, set when result is array or Collection) ---
+    private int arrayLength = -1;   // length of array or Collection result (-1 = not an array/collection, 0+ = actual length)
 
     // --- Response fields (populated after invocation) ---
     private String returnType;      // return type simple name
@@ -66,7 +73,8 @@ public class MethodCallNode {
     public boolean isClassRef() {
         return className != null && !className.isEmpty()
             && (methodName == null || methodName.isEmpty())
-            && !"field".equals(callType);
+            && !"field".equals(callType)
+            && !"capturedRef".equals(callType);
     }
 
     // --- Getters and setters ---
@@ -117,6 +125,20 @@ public class MethodCallNode {
 
     public int getIndex() { return index; }
     public void setIndex(int index) { this.index = index; }
+
+    public String getCapturedValue() { return capturedValue; }
+    public void setCapturedValue(String capturedValue) { this.capturedValue = capturedValue; }
+
+    public int getCapturedParamIndex() { return capturedParamIndex; }
+    public void setCapturedParamIndex(int capturedParamIndex) { this.capturedParamIndex = capturedParamIndex; }
+
+    public int getArrayLength() { return arrayLength; }
+    public void setArrayLength(int arrayLength) { this.arrayLength = arrayLength; }
+
+    /** Check if this node is a captured reference (pre-resolved object from param capture weave). */
+    public boolean isCapturedRef() {
+        return "capturedRef".equals(callType);
+    }
 
     @Override
     public String toString() {
@@ -178,6 +200,18 @@ public class MethodCallNode {
         if (index >= 0) {
             sb.append(",\"index\":").append(index);
         }
+        if (capturedValue != null) {
+            if (sb.length() > 1) sb.append(",");
+            sb.append("\"capturedValue\":\"").append(escapeJson(capturedValue)).append("\"");
+        }
+        if (capturedParamIndex >= 0) {
+            if (sb.length() > 1) sb.append(",");
+            sb.append("\"capturedParamIndex\":").append(capturedParamIndex);
+        }
+        if (arrayLength >= 0) {
+            if (sb.length() > 1) sb.append(",");
+            sb.append("\"arrayLength\":").append(arrayLength);
+        }
 
         // Nested structures
         if (target != null) {
@@ -199,5 +233,72 @@ public class MethodCallNode {
     private String escapeJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+    }
+
+    /**
+     * Flatten the target-linked tree into a sequential chain list.
+     * Walks the target chain from innermost (deepest target) to outermost (root),
+     * producing [innermost, ..., root] order matching the frontend chainSteps[] model.
+     * Each node in the list has its target field cleared (the relationship is implicit by position).
+     */
+    public List<MethodCallNode> flattenChain() {
+        List<MethodCallNode> chain = new ArrayList<MethodCallNode>();
+        // Collect innermost first by recursing into targets
+        if (target != null) {
+            chain.addAll(target.flattenChain());
+        }
+        // Add this node (clear target since it's implicit in the flat format)
+        MethodCallNode copy = shallowCopy();
+        copy.target = null;  // relationship is implicit by position in the chain array
+        chain.add(copy);
+        return chain;
+    }
+
+    /**
+     * Create a shallow copy of this node (does NOT copy target or params recursively).
+     * Used by flattenChain() to produce nodes without target references.
+     */
+    private MethodCallNode shallowCopy() {
+        MethodCallNode copy = new MethodCallNode();
+        copy.className = this.className;
+        copy.methodName = this.methodName;
+        copy.paramTypes = this.paramTypes;
+        copy.value = this.value;
+        copy.valueType = this.valueType;
+        copy.callType = this.callType;
+        copy.index = this.index;
+        copy.capturedValue = this.capturedValue;
+        copy.capturedParamIndex = this.capturedParamIndex;
+        copy.arrayLength = this.arrayLength;
+        copy.loaderId = this.loaderId;
+        // Response fields
+        copy.returnType = this.returnType;
+        copy.realReturnType = this.realReturnType;
+        copy.returnValue = this.returnValue;
+        copy.isVoid = this.isVoid;
+        copy.exception = this.exception;
+        copy.duration = this.duration;
+        // Copy params list (each param may be a literal, sub-chain, etc.)
+        if (this.params != null) {
+            copy.params = new ArrayList<MethodCallNode>(this.params);
+        }
+        return copy;
+    }
+
+    /**
+     * Produce a flat chain JSON string: { "chain": [node0, node1, node2, ...] }
+     * where node0 is the innermost (deepest target) and the last node is the outermost (root).
+     * This format matches the frontend chainSteps[] display order.
+     */
+    public String toChainString() {
+        List<MethodCallNode> chain = flattenChain();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"chain\":[");
+        for (int i = 0; i < chain.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append(chain.get(i).toString());
+        }
+        sb.append("]}");
+        return sb.toString();
     }
 }

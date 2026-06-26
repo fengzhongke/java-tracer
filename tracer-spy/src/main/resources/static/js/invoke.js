@@ -16,6 +16,7 @@
 // =============================================
 
 var chainSteps = [];  // Flat array of steps. [0]=first, [1]=second, etc.
+var maxDisplayLen = 500;  // Max display length for exceptions, return values (configurable via input)
 
 function createMethodStep(className, methodName, paramTypes, isStatic, loaderId) {
     return {
@@ -90,6 +91,26 @@ function createClassRefStep(className, loaderId) {
     };
 }
 
+function createCapturedRefStep(className, capturedValue, capturedParamIndex) {
+    return {
+        callType: 'capturedRef',
+        className: className || '',
+        methodName: '',
+        capturedValue: capturedValue || '',
+        capturedParamIndex: capturedParamIndex >= 0 ? capturedParamIndex : 0,
+        paramTypes: '',
+        params: [],
+        isStatic: false,
+        loaderId: 0,
+        returnType: '',
+        returnValue: '',
+        isVoid: false,
+        exception: null,
+        duration: 0,
+        _returnTypeHint: ''
+    };
+}
+
 function createLiteralParam(value, valueType) {
     return {
         callType: 'literal',
@@ -147,6 +168,22 @@ function shortClassName(fqn) {
 function truncate(s, max) {
     if (!s) return '';
     return s.length <= max ? s : s.substring(0, max) + '...';
+}
+
+function updateMaxDisplayLen(val) {
+    var n = parseInt(val);
+    if (n && n >= 60) {
+        maxDisplayLen = n;
+        // Sync to backend so return values are not truncated
+        $.post('/invoke/config-max-len.json', {maxLen: String(n)});
+        // Re-render chain if there are steps with results
+        if (chainSteps.length > 0) {
+            renderChain();
+            if ($('#invoke_result').is(':visible')) {
+                showChainResult();
+            }
+        }
+    }
 }
 
 /** Check if an exception message is a cascade (target invocation failed) rather than a root cause. */
@@ -251,6 +288,7 @@ function clearStepsResults(steps) {
         steps[i].returnValue = '';
         steps[i].isVoid = false;
         steps[i].exception = null;
+        steps[i].arrayLength = -1;
         steps[i].duration = 0;
         // Also clear sub-chain param results
         if (steps[i].params) {
@@ -436,6 +474,7 @@ function renderStep(step, index, parentPathPrefix) {
     var cssClass = 'chain-step';
     if (step.callType === 'field') cssClass += ' step-field';
     else if (step.callType === 'classRef') cssClass += ' step-classref';
+    else if (step.callType === 'capturedRef') cssClass += ' step-capturedref';
     else if (step.callType === 'arrayGet') cssClass += ' step-arrayget';
     else if (step.isStatic) cssClass += ' step-static';
     else cssClass += ' step-method';
@@ -458,6 +497,8 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">Class</button>';
+        } else if (step.callType === 'capturedRef') {
+            html += '<button class="type-badge badge-capturedref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">captured</button>';
         } else if (step.callType === 'arrayGet') {
             html += '<button class="type-badge badge-arrayget" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">[' + step.index + ']</button>';
         } else {
@@ -471,6 +512,8 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">Class</button>';
+        } else if (step.callType === 'capturedRef') {
+            html += '<button class="type-badge badge-capturedref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">captured</button>';
         } else if (step.callType === 'arrayGet') {
             html += '<button class="type-badge badge-arrayget" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">[' + step.index + ']</button>';
         } else {
@@ -481,6 +524,9 @@ function renderStep(step, index, parentPathPrefix) {
     html += '<span class="step-name">';
     if (step.callType === 'classRef') {
         html += escapeHtml(shortClassName(step.className)) + '.class';
+    } else if (step.callType === 'capturedRef') {
+        html += '<span style="color:#f0ad4e;font-weight:bold;">this</span> ';
+        html += '<span style="color:#999;font-size:11px;">(' + escapeHtml(shortClassName(step.className)) + ': ' + escapeHtml(truncate(step.capturedValue, 40)) + ')</span>';
     } else if (step.callType === 'arrayGet') {
         html += '[' + step.index + ']';
     } else if (step.className) {
@@ -491,13 +537,14 @@ function renderStep(step, index, parentPathPrefix) {
     // Inline result after the name on the same line
     if (step.exception) {
         if (isCascadeException(step.exception)) {
-            html += ' <span class="ret-cascade">=> cascade: ' + escapeHtml(truncate(extractRootCause(step.exception), 60)) + '</span>';
+            html += ' <span class="ret-cascade">=> cascade: ' + escapeHtml(truncate(extractRootCause(step.exception), maxDisplayLen)) + '</span>';
         } else {
-            html += ' <span class="ret-error">=> ' + escapeHtml(truncate(step.exception, 80)) + '</span>';
+            html += ' <span class="ret-error">=> ' + escapeHtml(truncate(step.exception, maxDisplayLen)) + '</span>';
         }
     } else if (step.returnType || step.returnValue) {
         html += ' => <span class="ret-type">' + escapeHtml(step.returnType) + '</span>';
-        if (step.returnValue) html += ': <span class="ret-value">' + escapeHtml(truncate(step.returnValue, 80)) + '</span>';
+        if (step.returnValue) html += ': <span class="ret-value">' + escapeHtml(truncate(step.returnValue, maxDisplayLen)) + '</span>';
+        if (step.arrayLength >= 0) html += ' <span class="ret-length">[length=' + step.arrayLength + ']</span>';
         if (step.duration > 0) html += ' <span class="ret-duration">(' + step.duration + 'ms)</span>';
     }
     html += '</span>';
@@ -889,12 +936,12 @@ function invokeForPeek() {
 
     msContext = { action: 'addNextStepAfterPeek' };
 
-    var json = serializeToTree();
+    var json = serializeToChain();
     $.ajax({
         url: '/invoke/execMembers.json',
         type: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(json),
+        data: json,
         success: function(responseStr) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
@@ -902,7 +949,7 @@ function invokeForPeek() {
                 var data = ret.data;
                 // Update invoke results into the chain
                 var invokeResult = data.invokeResult;
-                updateResultsFromTree(invokeResult, chainSteps.length);
+                updateResultsFromChain(invokeResult, chainSteps.length);
                 renderChain();
 
                 var lastStep = chainSteps[chainSteps.length - 1];
@@ -971,19 +1018,19 @@ function invokeForPeekSub(pathPrefix) {
 
     msContext = { action: 'addNextSubStepAfterPeek', pathStr: pathPrefix };
 
-    var json = serializeToTree();
+    var json = serializeToChain();
     $.ajax({
         url: '/invoke/execMembers.json',
         type: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(json),
+        data: json,
         success: function(responseStr) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
                 var data = ret.data;
                 var invokeResult = data.invokeResult;
-                updateResultsFromTree(invokeResult, chainSteps.length);
+                updateResultsFromChain(invokeResult, chainSteps.length);
                 renderChain();
 
                 var lastSub = subSteps[subSteps.length - 1];
@@ -1346,17 +1393,17 @@ function invokeChainUpTo(stepIndex) {
     // Clear all previous results before invoking to avoid stale data
     clearAllResults();
 
-    var json = serializeStepsRange(chainSteps, 0, upTo + 1);
+    var json = serializeChainRange(chainSteps, 0, upTo + 1);
     $.ajax({
         url: '/invoke/exec',
         type: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(json),
+        data: json,
         success: function(responseStr) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                updateResultsFromTree(ret.data, upTo + 1);
+                updateResultsFromChain(ret.data, upTo + 1);
                 renderChain();
                 showChainResult();
             } else {
@@ -1373,25 +1420,25 @@ function invokeSubChain(pathPrefix) {
     var subSteps = getSubStepsByPathPrefix(pathPrefix);
     if (!subSteps || subSteps.length === 0) { alert('Add at least one sub-chain step'); return; }
 
-    var json = serializeStepsRange(subSteps, 0, subSteps.length);
+    var json = serializeChainRange(subSteps, 0, subSteps.length);
     $.ajax({
         url: '/invoke/exec',
         type: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify(json),
+        data: json,
         success: function(responseStr) {
             var ret;
             try { ret = JSON.parse(responseStr); } catch(e) { alert('Invalid response'); return; }
             if (ret.status) {
-                // Merge results back into the sub-steps
-                var respSubSteps = flattenTreeToSteps(ret.data);
-                for (var j = 0; j < subSteps.length && j < respSubSteps.length; j++) {
-                    mergeResponseToStep(subSteps[j], respSubSteps[j]);
+                // Merge results back into the sub-steps (response is flat chain array)
+                var respChain = ret.data;
+                for (var j = 0; j < subSteps.length && j < respChain.length; j++) {
+                    mergeResponseToStep(subSteps[j], respChain[j]);
                 }
                 // Update _returnTypeHint on the last sub-step so the parent step knows the type
-                if (subSteps.length > 0 && respSubSteps.length > 0) {
+                if (subSteps.length > 0 && respChain.length > 0) {
                     var lastSub = subSteps[subSteps.length - 1];
-                    var lastResp = respSubSteps[respSubSteps.length - 1];
+                    var lastResp = respChain[respChain.length - 1];
                     if (lastResp.returnType) {
                         lastSub._returnTypeHint = lastResp.returnType;
                         // Also update the parent step's param _paramTypeHint if possible
@@ -1440,14 +1487,15 @@ function showChainResult() {
 
         if (hasError) {
             if (isCascade) {
-                html += ' <span class="result-value-cascade">CASCADE: ' + escapeHtml(truncate(extractRootCause(step.exception), 60)) + '</span>';
+                html += ' <span class="result-value-cascade">CASCADE: ' + escapeHtml(truncate(extractRootCause(step.exception), maxDisplayLen)) + '</span>';
                 html += '<span class="result-meta">(blocked by upstream failure)</span>';
             } else {
-                html += ' <span class="result-value-error">FAILED: ' + escapeHtml(truncate(step.exception, 60)) + '</span>';
+                html += ' <span class="result-value-error">FAILED: ' + escapeHtml(truncate(step.exception, maxDisplayLen)) + '</span>';
             }
         } else {
             html += ' <span class="result-value">=> ' + escapeHtml(step.returnValue || 'void') + '</span>';
             html += '<span class="result-meta">(' + escapeHtml(step.returnType || '?') + ', ' + step.duration + 'ms)</span>';
+            if (step.arrayLength >= 0) html += '<span class="result-meta"> [length=' + step.arrayLength + ']</span>';
         }
         html += '</div>';
     }
@@ -1464,21 +1512,27 @@ function showChainResult() {
  * chainSteps[0] = innermost (no target), chainSteps[last] = root.
  * Build outward: each new step wraps the previous as its target.
  */
-function serializeToTree() {
+function serializeToChain() {
     if (chainSteps.length === 0) return null;
-    return serializeStepsRange(chainSteps, 0, chainSteps.length);
+    var chain = [];
+    for (var i = 0; i < chainSteps.length; i++) {
+        var node = cloneStepForSerialization(chainSteps[i]);
+        // In the flat chain format, the relationship between steps is implicit by position:
+        // chain[i+1] uses chain[i]'s result as receiver. No "target" field needed.
+        chain.push(node);
+    }
+    return JSON.stringify({ chain: chain }, null, 2);
 }
 
-/** Serialize a range of steps [start, end) from a steps array into a target-linked tree. */
-function serializeStepsRange(steps, start, end) {
+/** Serialize a range of steps [start, end) into a flat chain array format. */
+function serializeChainRange(steps, start, end) {
     if (!steps || steps.length === 0 || start >= end) return null;
-    var tree = null;
+    var chain = [];
     for (var i = start; i < end; i++) {
         var node = cloneStepForSerialization(steps[i]);
-        if (tree) { node.target = tree; node.isStatic = false; }
-        tree = node;
+        chain.push(node);
     }
-    return tree;
+    return JSON.stringify({ chain: chain }, null, 2);
 }
 
 function cloneStepForSerialization(step) {
@@ -1487,6 +1541,10 @@ function cloneStepForSerialization(step) {
     node.className = step.className || '';
     if (step.methodName) node.methodName = step.methodName;
     if (step.index >= 0) node.index = step.index;
+    if (step.callType === 'capturedRef') {
+        node.capturedValue = step.capturedValue || '';
+        node.capturedParamIndex = step.capturedParamIndex >= 0 ? step.capturedParamIndex : 0;
+    }
     var pt = normalizeParamTypes(step.paramTypes);
     if (pt && pt.trim()) {
         node.paramTypes = pt.split(',').map(function(s) { return s.trim(); });
@@ -1510,6 +1568,9 @@ function serializeParam(param) {
     if (param.callType === 'classRef') {
         return { className: param.className || '', callType: 'classRef', loaderId: param.loaderId || 0 };
     }
+    if (param.callType === 'capturedRef') {
+        return { className: param.className || '', callType: 'capturedRef', capturedValue: param.capturedValue || '', capturedParamIndex: param.capturedParamIndex >= 0 ? param.capturedParamIndex : 0 };
+    }
     if (param.callType === 'subchain') {
         var subSteps = param.subSteps || [];
         if (subSteps.length === 0) {
@@ -1529,13 +1590,29 @@ function serializeParam(param) {
 }
 
 /**
- * Convert MethodCallNode target-linked tree to flat chainSteps[].
+ * Deserialize a backend response into chainSteps[].
+ * Supports two formats:
+ * 1. Flat chain array (current): ret.data = [node0, node1, node2, ...]
+ * 2. Target-linked tree (legacy): ret.data = { className, methodName, target: { ... } }
  */
-function deserializeFromTree(tree) {
-    chainSteps = flattenTreeToSteps(tree);
-    // Recursively convert sub-chain params
-    for (var i = 0; i < chainSteps.length; i++) {
-        convertParamsFromTree(chainSteps[i]);
+function deserializeFromResponse(data) {
+    if (!data) return;
+    // Check if data is an array (flat chain format)
+    if (Array.isArray(data)) {
+        chainSteps = [];
+        for (var i = 0; i < data.length; i++) {
+            var step = data[i];
+            // Normalize paramTypes
+            if (step.paramTypes) step.paramTypes = normalizeParamTypes(step.paramTypes);
+            convertParamsFromTree(step);
+            chainSteps.push(step);
+        }
+    } else {
+        // Legacy target-linked tree format
+        chainSteps = flattenTreeToSteps(data);
+        for (var i = 0; i < chainSteps.length; i++) {
+            convertParamsFromTree(chainSteps[i]);
+        }
     }
 }
 
@@ -1560,6 +1637,8 @@ function convertParamsFromTree(step) {
             param._paramTypeHint = param.valueType || '';
         } else if (param.callType === 'classRef') {
             param._paramTypeHint = 'Class';
+        } else if (param.callType === 'capturedRef') {
+            param._paramTypeHint = param.className || '';
         } else if (param.callType === 'null') {
             param._paramTypeHint = '';
         } else if (param.callType === 'method' || param.callType === 'field' || (param.className && !param.callType)) {
@@ -1583,34 +1662,21 @@ function convertParamsFromTree(step) {
 
 /**
  * Update chainSteps with response data from backend.
- * The response tree is target-linked: root is the outermost step,
- * each node.target points to the next inner step.
- * Our chainSteps[] is flat: [innermost, ..., outermost].
+ * The response is now a flat chain array: [step0, step1, step2, ...]
+ * where data[i] corresponds directly to chainSteps[i].
+ * Much simpler than the old target-linked tree traversal.
  *
  * count: how many steps from chainSteps to update (from chainSteps[0] to chainSteps[count-1]).
  * If not specified, defaults to chainSteps.length.
- * This is critical for invokeChainUpTo where only steps 0..N are invoked,
- * so the response tree root corresponds to chainSteps[N] (not chainSteps[last]).
  */
-function updateResultsFromTree(tree, count) {
-    if (!tree) return;
-    if (chainSteps.length === 0) return;
+function updateResultsFromChain(chainData, count) {
+    if (!chainData || chainSteps.length === 0) return;
     var n = (count !== undefined && count !== null) ? Math.min(count, chainSteps.length) : chainSteps.length;
     if (n <= 0) return;
 
-    // Walk the response tree from outermost to innermost via .target chain.
-    // chainSteps[0] = innermost, chainSteps[n-1] = outermost (for the invoked range).
-    // The tree root IS the outermost step of the invoked range.
-    // Match: chainSteps[n-1] ↔ tree, chainSteps[n-2] ↔ tree.target, ... chainSteps[0] ↔ deepest target
-    var respNode = tree;
-    for (var i = n - 1; i >= 0; i--) {
-        if (respNode) {
-            console.log('[merge] chainSteps[' + i + '] "' + (chainSteps[i].methodName || chainSteps[i].className) + '" ↔ resp "' + (respNode.methodName || respNode.className || '?') + '" exception=' + (respNode.exception || 'null') + ' returnType=' + (respNode.returnType || 'null'));
-            mergeResponseToStep(chainSteps[i], respNode);
-            respNode = respNode.target || null;
-        } else {
-            console.log('[merge] chainSteps[' + i + '] "' + (chainSteps[i].methodName || chainSteps[i].className) + '" ↔ NO resp node (target chain exhausted)');
-        }
+    for (var i = 0; i < n && i < chainData.length; i++) {
+        console.log('[merge] chainSteps[' + i + '] "' + (chainSteps[i].methodName || chainSteps[i].className) + '" ↔ resp "' + (chainData[i].methodName || chainData[i].className || '?') + '" exception=' + (chainData[i].exception || 'null') + ' returnType=' + (chainData[i].returnType || 'null'));
+        mergeResponseToStep(chainSteps[i], chainData[i]);
     }
 }
 
@@ -1627,6 +1693,9 @@ function mergeResponseToStep(model, resp) {
     model.returnValue = resp.returnValue || '';
     model.isVoid = resp.isVoid !== undefined ? resp.isVoid : false;
     model.duration = resp.duration !== undefined ? resp.duration : 0;
+    if (resp.arrayLength !== undefined && resp.arrayLength >= 0) model.arrayLength = resp.arrayLength;
+    if (resp.capturedValue) model.capturedValue = resp.capturedValue;
+    if (resp.capturedParamIndex !== undefined && resp.capturedParamIndex >= 0) model.capturedParamIndex = resp.capturedParamIndex;
     if (!model._returnTypeHint && resp.returnType) model._returnTypeHint = resp.returnType;
     // realReturnType gives the full runtime class name — use it for next-step resolution
     if (resp.realReturnType) model.realReturnType = resp.realReturnType;
@@ -1680,14 +1749,14 @@ function mergeResponseToStep(model, resp) {
 // =============================================
 
 function openJsonEditor() {
-    var json = serializeToTree();
-    $('#json_textarea').val(json ? JSON.stringify(json, null, 2) : '');
+    var json = serializeToChain();
+    $('#json_textarea').val(json || '');
     $('#json_modal').modal('show');
 }
 
 function exportFormToJson() {
-    var json = serializeToTree();
-    $('#json_textarea').val(json ? JSON.stringify(json, null, 2) : '');
+    var json = serializeToChain();
+    $('#json_textarea').val(json || '');
 }
 
 function importJsonToForm() {
@@ -1695,7 +1764,21 @@ function importJsonToForm() {
     if (!text) { alert('Paste JSON first'); return; }
     try {
         var json = JSON.parse(text);
-        deserializeFromTree(json);
+        // Support both chain array format and legacy target-linked tree
+        if (json.chain) {
+            // Flat chain format: { chain: [step0, step1, ...] }
+            chainSteps = [];
+            for (var i = 0; i < json.chain.length; i++) {
+                var step = json.chain[i];
+                // Normalize paramTypes
+                if (step.paramTypes) step.paramTypes = normalizeParamTypes(step.paramTypes);
+                convertParamsFromTree(step);
+                chainSteps.push(step);
+            }
+        } else {
+            // Legacy target-linked tree format
+            deserializeFromResponse(json);
+        }
         expandedEditors = {};
         renderChain();
     } catch(e) { alert('JSON parse error: ' + e.message); }
@@ -1711,4 +1794,270 @@ $(document).ready(function() {
     $('#ms_class_search_input').on('keypress', function(e) {
         if (e.which === 13) { e.preventDefault(); msSearchClasses(); }
     });
+
+    $('#weave_class_search_input').on('keypress', function(e) {
+        if (e.which === 13) { e.preventDefault(); weaveSearchClasses(); }
+    });
+
+    // Restore weave state from backend on page load
+    restoreWeaveState();
+});
+
+// =============================================
+// Weave (Param Capture)
+// =============================================
+
+var weaveClassName = '';
+var weaveMethodDesc = '';
+var weaveSelectedMethodRaw = '';  // original (unsanitized) method name for display
+var weaveSelectedParamTypeFqns = [];  // fully qualified param type names for Method resolution
+
+function restoreWeaveState() {
+    $.get('/invoke/weave-status.json', function(str) {
+        var ret;
+        try { ret = JSON.parse(str); } catch(e) { return; }
+        if (ret.status && ret.data) {
+            var data = ret.data;
+            if (data.className) {
+                weaveClassName = data.className;
+                weaveMethodDesc = data.methodName || '';
+                weaveSelectedMethodRaw = data.methodName || '';
+                weaveSelectedParamTypeFqns = data.paramTypes || [];
+                $('#weave_status').html('Weaved: <b style="color:#3c763d;">' + weaveClassName + '#' + weaveMethodDesc + '</b>');
+                $('#unweave_btn').show();
+                // Also restore captured params if available
+                if (data.capturedParams && data.capturedParams.length > 0) {
+                    renderCapturedParams(data.capturedParams);
+                }
+                // Auto-populate chain from weave if chain is empty
+                if (chainSteps.length === 0 && data.capturedParams && data.capturedParams.length > 0) {
+                    autoPopulateChainFromWeave();
+                }
+            } else {
+                $('#weave_status').html('No weave target set');
+                $('#unweave_btn').hide();
+            }
+        }
+    });
+}
+
+function autoPopulateChainFromWeave() {
+    $.get('/invoke/weave-chain.json', function(str) {
+        var ret;
+        try { ret = JSON.parse(str); } catch(e) { return; }
+        if (ret.status && ret.data) {
+            // Deserialize the tree into chainSteps[]
+            deserializeFromResponse(ret.data);
+            renderChain();
+        }
+    });
+}
+
+function renderCapturedParams(params) {
+    if (!params || params.length === 0) {
+        $('#weave_captured_params').html('No captured params yet — call the weaved method first');
+        $('#use_params_btn').hide();
+        return;
+    }
+    var html = '<b>Captured params:</b> ';
+    for (var i = 0; i < params.length; i++) {
+        var p = params[i];
+        if (i > 0) html += ', ';
+        if (p.isReceiver) {
+            html += '<span style="color:#f0ad4e;font-weight:bold;">this</span> ';
+            html += '<span style="color:#999;font-size:11px;">(' + p.type + ')</span> ';
+            html += '<span style="color:#8a6d3b;">' + p.value + '</span>';
+        } else {
+            html += '<span style="color:#31708f;">param' + (i - 1) + '</span> ';
+            html += '<span style="color:#999;font-size:11px;">(' + p.type + ')</span> ';
+            html += '<span style="color:#3c763d;">' + p.value + '</span>';
+        }
+    }
+    $('#weave_captured_params').html(html);
+    $('#use_params_btn').show();
+}
+
+function showWeaveModal() {
+    weaveClassName = '';
+    weaveMethodDesc = '';
+    weaveSelectedMethodRaw = '';
+    $('#weave_class_label').text('Search a class first');
+    $('#weave_change_class_btn').hide();
+    $('#weave_class_search_area').show();
+    $('#weave_class_search_input').val('');
+    $('#weave_class_list').html('');
+    $('#weave_method_list').hide().html('');
+    $('#weave_btn').hide();
+    $('#weave_modal').modal('show');
+    $('#weave_class_search_input').focus();
+}
+
+function weaveShowClassSearch() {
+    $('#weave_class_search_area').toggle();
+    if ($('#weave_class_search_area').is(':visible')) {
+        $('#weave_class_search_input').val('').focus();
+        $('#weave_class_list').html('');
+    }
+}
+
+function weaveSearchClasses() {
+    var prefix = $('#weave_class_search_input').val().trim();
+    if (!prefix) { alert('Type a class name prefix'); return; }
+    $.post('/invoke/classes.json', {prefix: prefix}, function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status && ret.data && ret.data.length > 0) {
+            var html = '';
+            for (var i = 0; i < ret.data.length; i++) {
+                var cn = ret.data[i].name;
+                var lid = ret.data[i].loaderId || 0;
+                html += '<div class="class-item" onclick="weaveSelectClass(\'' + cn.replace(/'/g, "\\'") + '\',' + lid + ')">';
+                html += '<span style="font-weight:bold;">' + cn + '</span>';
+                if (lid > 0) html += ' <span style="color:#d9534f;font-size:11px;">[loader#' + lid + ']</span>';
+                html += '</div>';
+            }
+            $('#weave_class_list').html(html);
+        } else {
+            $('#weave_class_list').html('<div style="color:#999;padding:6px;">No classes found</div>');
+        }
+    });
+}
+
+function weaveSelectClass(className, loaderId) {
+    weaveClassName = className;
+    weaveMethodDesc = '';
+    weaveSelectedMethodRaw = '';
+    $('#weave_class_label').text(className);
+    $('#weave_change_class_btn').show();
+    $('#weave_class_search_area').hide();
+    $('#weave_method_list').show().html('<div style="color:#999;padding:8px;">Loading methods...</div>');
+    $('#weave_btn').hide();
+
+    $.post('/invoke/members.json', {className: className}, function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status && ret.data) {
+            var members = ret.data;
+            var methodsWithParams = [];
+            for (var i = 0; i < members.length; i++) {
+                if (!members[i].isField && members[i].paramTypes && members[i].paramTypes.length > 0) {
+                    methodsWithParams.push(members[i]);
+                }
+            }
+
+            var html = '';
+            if (methodsWithParams.length > 0) {
+                html += '<div class="member-section-header">Methods with params (' + methodsWithParams.length + ')</div>';
+                for (var i = 0; i < methodsWithParams.length; i++) {
+                    var m = methodsWithParams[i];
+                    var sanitized = m.name.replace(/</g, '_').replace(/>/g, '');
+                    var info = JSON.stringify({name: m.name, paramTypes: m.paramTypes, paramTypeFqns: m.paramTypeFqns || [], returnType: m.returnType, isStatic: m.isStatic});
+                    html += '<div class="member-item weave-method-item" onclick="weaveSelectMethod(this)" data-method-info="' + escapeAttr(info) + '" data-sanitized="' + escapeAttr(sanitized) + '">';
+                    html += '<div><span class="member-name">' + m.name + '(' + m.paramTypes.join(', ') + ') → ' + m.returnType + '</span>';
+                    if (m.isStatic) html += ' <span class="type-badge badge-static">static</span>';
+                    html += '</div>';
+                    html += '</div>';
+                }
+            } else {
+                html = '<div style="color:#999;padding:6px;">No methods with parameters found</div>';
+            }
+            $('#weave_method_list').html(html);
+        }
+    });
+}
+
+function weaveSelectMethod(elem) {
+    var infoStr = elem.getAttribute('data-method-info');
+    var info = JSON.parse(infoStr);
+    weaveMethodDesc = elem.getAttribute('data-sanitized');
+    weaveSelectedMethodRaw = info.name;  // original method name (e.g., "<init>" or "foo")
+    weaveSelectedParamTypeFqns = info.paramTypeFqns || [];
+
+    // Highlight selected method
+    $('.weave-method-item').css('background', '');
+    $(elem).css('background', '#dff0d8');
+    $('#weave_btn').show().html('<span class="glyphicon glyphicon-wrench"></span> Weave ' + weaveClassName + '#' + weaveSelectedMethodRaw);
+}
+
+function weaveMethod() {
+    if (!weaveClassName || !weaveSelectedMethodRaw) { alert('Select a class and method first'); return; }
+    var internalName = weaveClassName.replace(/\./g, '/');
+    var methodName = weaveSelectedMethodRaw;  // ORIGINAL name, not sanitized (e.g., "<init>" or "foo")
+    var paramTypesStr = weaveSelectedParamTypeFqns.join(',');  // comma-separated FQN string
+
+    $.post('/invoke/weave.json', {className: internalName, methodName: methodName, paramTypes: paramTypesStr}, function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status) {
+            $('#weave_modal').modal('hide');
+            $('#weave_status').html('Weaved: <b style="color:#3c763d;">' + weaveClassName + '#' + methodName + '</b>');
+            $('#unweave_btn').show();
+        } else {
+            alert('Weave failed: ' + ret.msg);
+        }
+    });
+}
+
+function unweaveMethod() {
+    if (!weaveClassName) { alert('No weave target'); return; }
+    var internalName = weaveClassName.replace(/\./g, '/');
+
+    $.post('/invoke/unweave.json', {className: internalName}, function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status) {
+            $('#weave_status').html('No weave target set');
+            $('#unweave_btn').hide();
+            $('#weave_captured_params').html('');
+            $('#use_params_btn').hide();
+        } else {
+            alert('Unweave failed: ' + ret.msg);
+        }
+    });
+}
+
+function refreshCapturedParams() {
+    $.get('/invoke/captured-params.json', function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status) {
+            renderCapturedParams(ret.data);
+        } else {
+            renderCapturedParams(null);
+        }
+    });
+}
+
+function useCapturedParamsAsInvoke() {
+    // Directly invoke the weaved method using captured params via invokeCapture,
+    // then populate chain editor with the result so user can continue chaining.
+    $.get('/invoke/exec-capture.json', function(str) {
+        var ret;
+        try { ret = JSON.parse(str); } catch(e) { alert('Invalid response'); return; }
+        if (ret.status && ret.data) {
+            chainSteps = [];  // Clear existing chain
+            deserializeFromResponse(ret.data);
+            renderChain();
+            showChainResult();
+        } else {
+            $('#invoke_result').show();
+            $('#result_container').html('<div style="color:#a94442;padding:8px;">' + escapeHtml(ret.msg || 'unknown error') + '</div>');
+        }
+    }).fail(function(xhr) {
+        alert('HTTP error: ' + xhr.status);
+    });
+}
+
+// =============================================
+// Init
+// =============================================
+
+$(document).ready(function() {
+    renderChain();
+
+    $('#ms_class_search_input').on('keypress', function(e) {
+        if (e.which === 13) { e.preventDefault(); msSearchClasses(); }
+    });
+
+    $('#weave_class_search_input').on('keypress', function(e) {
+        if (e.which === 13) { e.preventDefault(); weaveSearchClasses(); }
+    });
+
+    // Restore weave state from backend on page load
+    restoreWeaveState();
 });

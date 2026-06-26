@@ -2,8 +2,10 @@ package com.ali.trace.spy.inject;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.NodePool;
+import com.ali.trace.spy.interceptor.BaseInterceptor;
 import com.ali.trace.spy.interceptor.CommonThreadntercepter;
 import com.ali.trace.spy.interceptor.CompressThreadInterceptor;
+import com.ali.trace.spy.interceptor.IInterceptor;
 import com.ali.trace.spy.jetty.JettyServer;
 import com.ali.trace.spy.jetty.io.AgentResVmLoader;
 
@@ -44,6 +46,8 @@ public class TraceInjector {
 
     private final Method END;
 
+    private final Method SET_PARAMS;
+
     private final ConfigPool POOL = ConfigPool.getPool();
 
     private volatile Set<String> includePrefix = new HashSet<>();
@@ -59,6 +63,8 @@ public class TraceInjector {
         TYPE = Type.getType(clasz);
         START = Method.getMethod(clasz.getMethod("s", new Class<?>[] {String.class, String.class}));
         END = Method.getMethod(clasz.getMethod("e", new Class<?>[] {String.class, String.class}));
+        SET_PARAMS = Method.getMethod(clasz.getMethod("setParams", new Class<?>[] {Object[].class}));
+        setParamsMethod(clasz);
         POOL.setInst(inst, this);
         POOL.setWeaveClass(clasz);
         NodePool.getPool().setMode(mode);
@@ -75,11 +81,31 @@ public class TraceInjector {
         new JettyServer(port);
     }
 
+    private void setParamsMethod(Class<?> weaveClass) {
+        try {
+            // IMPORTANT: must use java.lang.reflect.Method.class, NOT Method.class (which is
+            // org.objectweb.asm.commons.Method in this file's imports). TraceEnhance.setParamsMethod()
+            // takes java.lang.reflect.Method as its parameter type, so the lookup must match that.
+            java.lang.reflect.Method setParamsMethodOnWeaveClass = weaveClass.getDeclaredMethod("setParamsMethod", java.lang.reflect.Method.class);
+            java.lang.reflect.Method setParamsMethod = BaseInterceptor.class.getMethod("setParams", Object[].class);
+            setParamsMethodOnWeaveClass.invoke(null, setParamsMethod);
+        } catch (Throwable e) {
+            // This may fail during constructor initialization due to class-loading timing.
+            // SET_PARAMS will be initialized later in ConfigPool.setWeaveClass() or
+            // InvokeHandler.ensureSetParamsInitialized() as a fallback.
+            System.out.println("[tracer] setParamsMethod init failed (will retry later): " + e.getMessage());
+        }
+    }
+
     public byte[] getBytes(final ClassLoader loader, final String name, byte[] bytes) throws Throwable {
         Integer type = 0;
         try {
             if (name != null) {
-                if (loader != null && !filter(name)) {
+                // Check param capture target first — bypass filter for param capture classes
+                String paramCaptureInternalClass = POOL.getParamCaptureInternalClassName();
+                boolean isParamCaptureTarget = paramCaptureInternalClass != null
+                    && name.equals(paramCaptureInternalClass);
+                if (isParamCaptureTarget || !filter(name)) {
                     byte[] newBytes = new CodeReader(loader, name, bytes, POOL.isRedefine(loader, name),
                         true).getBytes();  // Always use common mode for better compatibility
                     bytes = newBytes;
@@ -158,6 +184,15 @@ public class TraceInjector {
         Set<String> newSet = new HashSet<>(includePrefix);
         newSet.add(prefix);
         includePrefix = newSet;
+}
+
+    /**
+     * Remove a prefix from include list. Creates new HashSet to maintain volatile semantics.
+     */
+    public void removeIncludePrefix(String prefix) {
+        Set<String> newSet = new HashSet<>(includePrefix);
+        newSet.remove(prefix);
+        includePrefix = newSet;
     }
 
     /**
@@ -167,15 +202,6 @@ public class TraceInjector {
         Set<String> newSet = new HashSet<>(excludePrefix);
         newSet.add(prefix);
         excludePrefix = newSet;
-    }
-
-    /**
-     * Remove a prefix from include list. Creates new HashSet to maintain volatile semantics.
-     */
-    public void removeIncludePrefix(String prefix) {
-        Set<String> newSet = new HashSet<>(includePrefix);
-        newSet.remove(prefix);
-        includePrefix = newSet;
     }
 
     /**
@@ -264,6 +290,7 @@ public class TraceInjector {
      */
     class CodeVisitor extends ClassVisitor {
         private String cName;
+        private String asmClassName;  // Raw ASM internal name (preserves $ signs) for precise matching
 
         private boolean common;
 
@@ -276,6 +303,7 @@ public class TraceInjector {
         public void visit(int paramInt1, int paramInt2, String paramString1, String paramString2, String paramString3,
             String[] paramArrayOfString) {
             cName = paramString1.replace('/', '.').replaceAll("\\$", ".");
+            asmClassName = paramString1;  // Store raw ASM internal name (preserves $ signs)
             super.visit(paramInt1, paramInt2, paramString1, paramString2, paramString3, paramArrayOfString);
         }
 
@@ -284,7 +312,19 @@ public class TraceInjector {
             if ((access & 256) != 0) {
                 return super.visitMethod(access, name, desc, signature, exceptions);
             }
-            //return new TraceTryFinallyAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name, desc);
+            String sanitized = name.replaceAll("<", "_").replaceAll("\\$|>", "");
+            // Check if this method is the param capture target using descriptor-level matching.
+            // This precisely identifies overloaded methods by class name + ASM descriptor.
+            java.lang.reflect.Executable paramTarget = POOL.getParamCaptureTarget();
+            String paramCaptureInternalClass = POOL.getParamCaptureInternalClassName();
+            String paramCaptureDesc = POOL.getParamCaptureDescriptor();
+            if (common && paramTarget != null
+                && asmClassName.equals(paramCaptureInternalClass)
+                && desc.equals(paramCaptureDesc)) {
+                return new ParamCaptureMethodVisitor(
+                    super.visitMethod(access, name, desc, signature, exceptions), access, name, desc,
+                    cName, TYPE, START, END, SET_PARAMS);
+            }
             if (common) {
                 return new CommonAdapter(super.visitMethod(access, name, desc, signature, exceptions), access, name,
                     desc);
