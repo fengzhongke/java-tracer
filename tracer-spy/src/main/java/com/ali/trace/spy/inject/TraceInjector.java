@@ -91,8 +91,7 @@ public class TraceInjector {
             setParamsMethodOnWeaveClass.invoke(null, setParamsMethod);
         } catch (Throwable e) {
             // This may fail during constructor initialization due to class-loading timing.
-            // SET_PARAMS will be initialized later in ConfigPool.setWeaveClass() or
-            // InvokeHandler.ensureSetParamsInitialized() as a fallback.
+            // SET_PARAMS will be initialized later in ConfigPool.setWeaveClass() as a fallback.
             System.out.println("[tracer] setParamsMethod init failed (will retry later): " + e.getMessage());
         }
     }

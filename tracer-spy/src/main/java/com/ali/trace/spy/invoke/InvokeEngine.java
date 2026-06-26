@@ -2,7 +2,6 @@ package com.ali.trace.spy.invoke;
 
 import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.core.ConfigPool.LoaderSet;
-import com.ali.trace.spy.interceptor.BaseInterceptor;
 import com.ali.trace.spy.jetty.vo.MethodCallNode;
 
 import java.lang.instrument.Instrumentation;
@@ -74,45 +73,7 @@ public class InvokeEngine {
             node.setVoid(false);
             node.setDuration(0);
             node.setException(null);
-            return node;
-        }
-
-        // --- Captured reference node --- (pre-resolved object from param capture weave)
-        // When callType is "capturedRef", this node represents a pre-resolved Java object
-        // captured from the weaved method's parameters. resolvedValue may be set on the server
-        // side before invoking (from exec-weaved endpoint), or null when sent from the frontend.
-        // When resolvedValue is null, the invoke engine resolves it from BaseInterceptor.getParams()
-        // using the capturedParamIndex field.
-        if (node.isCapturedRef()) {
-            if (node.resolvedValue != null) {
-                // Server-side pre-resolved (from exec-weaved endpoint)
-                node.setReturnType(node.resolvedValue.getClass().getSimpleName());
-                node.setRealReturnType(node.resolvedValue.getClass().getName());
-                node.setReturnValue(node.getCapturedValue() != null ? node.getCapturedValue() : formatResult(node.resolvedValue));
-                node.setVoid(false);
-                node.setDuration(0);
-                node.setException(null);
-                // Set arrayLength if the captured object is an array or collection
-                setResultArrayLength(node, node.resolvedValue);
-            } else {
-                // Frontend-originated capturedRef — resolve from BaseInterceptor captured params
-                Object[] captured = BaseInterceptor.getParams();
-                int idx = node.getCapturedParamIndex();
-                if (captured != null && idx >= 0 && idx < captured.length && captured[idx] != null) {
-                    node.resolvedValue = captured[idx];
-                    node.setReturnType(captured[idx].getClass().getSimpleName());
-                    node.setRealReturnType(captured[idx].getClass().getName());
-                    node.setReturnValue(formatResult(captured[idx]));
-                    node.setVoid(false);
-                    node.setDuration(0);
-                    node.setException(null);
-                    setResultArrayLength(node, captured[idx]);
-                } else {
-                    node.setException("capturedRef: no captured params available (call the weaved method first)");
-                    node.setDuration(0);
-                    node.resolvedValue = null;
-                }
-            }
+            setResultArrayLength(node, resolved);
             return node;
         }
 
@@ -120,13 +81,9 @@ public class InvokeEngine {
         // When className is provided but methodName is empty/null,
         // resolve the class directly and return the Class<?> object.
         // This is useful when a parameter needs a Class object (e.g. getBean(Class)).
-        // If resolvedValue is already set (e.g. by exec-weaved endpoint), skip re-resolution
-        // and use the existing value directly.
-        // NOTE: capturedRef nodes also have className set and methodName empty, so
-        // they must be handled BEFORE this block to avoid mis-identification.
+        // If resolvedValue is already set, skip re-resolution and use the existing value directly.
         if (node.getClassName() != null && !node.getClassName().isEmpty()
-            && (node.getMethodName() == null || node.getMethodName().isEmpty())
-            && !node.isCapturedRef()) {
+            && (node.getMethodName() == null || node.getMethodName().isEmpty())) {
             if (node.resolvedValue != null) {
                 // Already resolved (e.g. captured receiver from weaved method) — use directly
                 node.setReturnType(node.resolvedValue.getClass().getSimpleName());
@@ -549,7 +506,30 @@ public class InvokeEngine {
     private Class<?> findClass(String className, int loaderId) {
         ConfigPool pool = ConfigPool.getPool();
 
-        // Strategy 0: If loaderId is specified, try that ClassLoader first
+        // Strategy 0: For tracer-spy internal classes, always prefer the SpyClassLoader
+        // to avoid dual-class issues caused by Boot-Class-Path putting the entire agent
+        // jar on the bootstrap classpath. InvokeEngine.class.getClassLoader() is the
+        // bootstrap loader (null), so we must find the SpyClassLoader via ConfigPool's
+        // LoaderSets. Without this, findClass returns bootstrap-version tracer-spy classes
+        // which have separate static fields (e.g., ConfigPool.INSTANCE) from the
+        // SpyClassLoader versions used by HTTP handlers.
+        String dotName = className.replace('/', '.');
+        if (dotName.startsWith("com.ali.trace.spy.") || dotName.startsWith("com.ali.trace.agent.loader.")) {
+            // Search LoaderSets for the SpyClassLoader (a ClassLoader whose class name
+            // contains "SpyClassLoader") and try loading from it first
+            for (LoaderSet ls : pool.getAllLoadedClasses()) {
+                ClassLoader cl = ls.getLoader();
+                if (cl != null && cl.getClass().getName().contains("SpyClassLoader")) {
+                    try {
+                        return cl.loadClass(dotName);
+                    } catch (ClassNotFoundException e) {
+                        // Not in this SpyClassLoader, try next
+                    }
+                }
+            }
+        }
+
+        // Strategy 1: If loaderId is specified, try that ClassLoader first
         if (loaderId > 0) {
             LoaderSet ls = pool.getLoaderSet(loaderId);
             if (ls != null) {
@@ -561,7 +541,7 @@ public class InvokeEngine {
             }
         }
 
-        // Strategy 1: Try all loaded ClassLoaders from getAllLoadedClasses()
+        // Strategy 2: Try all loaded ClassLoaders from getAllLoadedClasses()
         for (LoaderSet ls : pool.getAllLoadedClasses()) {
             try {
                 return ls.getLoader().loadClass(className);
@@ -856,6 +836,22 @@ public class InvokeEngine {
         }
         if (value == null) {
             return null;
+        }
+
+        // Empty array: value="empty", valueType like "String[]", "int[]", "Object[]"
+        if ("empty".equals(value) && valueType.endsWith("[]")) {
+            String elemType = valueType.substring(0, valueType.length() - 2);
+            switch (elemType) {
+                case "int":     return new int[0];
+                case "long":    return new long[0];
+                case "short":   return new short[0];
+                case "byte":    return new byte[0];
+                case "float":   return new float[0];
+                case "double":  return new double[0];
+                case "boolean": return new boolean[0];
+                case "char":    return new char[0];
+                default:        return new Object[0];  // reference type arrays
+            }
         }
 
         switch (valueType) {

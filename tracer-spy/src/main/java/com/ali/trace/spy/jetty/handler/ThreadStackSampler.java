@@ -77,9 +77,15 @@ public class ThreadStackSampler {
         initialWallTime = System.nanoTime();
         if (cpuTimeSupported) {
             for (Thread thread : threads) {
-                long cpuTime = threadMXBean.getThreadCpuTime(thread.getId());
-                if (cpuTime >= 0) {
-                    initialCpuTimes.put(thread.getId(), cpuTime);
+                try {
+                    long cpuTime = threadMXBean.getThreadCpuTime(thread.getId());
+                    if (cpuTime >= 0) {
+                        initialCpuTimes.put(thread.getId(), cpuTime);
+                    }
+                } catch (Exception e) {
+                    // JDK 9+ module access restriction: sun.management not exported
+                    // Fall back — CPU percentage will not be reported
+                    System.err.println("getThreadCpuTime FAILED: " + e);
                 }
             }
         }
@@ -178,11 +184,16 @@ public class ThreadStackSampler {
             if (node.isThread()) {
                 Long initialCpu = initialCpuTimes.get(node.getId());
                 if (initialCpu != null) {
-                    long currentCpu = threadMXBean.getThreadCpuTime(node.getId());
-                    if (currentCpu >= 0) {
-                        double cpuPct = (currentCpu - initialCpu) * 100.0 / elapsedWallNanos;
-                        // Cap at 100% (single core) — can exceed if multiple cores
-                        node.setCpuPct(cpuPct);
+                    try {
+                        long currentCpu = threadMXBean.getThreadCpuTime(node.getId());
+                        if (currentCpu >= 0) {
+                            double cpuPct = (currentCpu - initialCpu) * 100.0 / elapsedWallNanos;
+                            // Cap at 100% (single core) — can exceed if multiple cores
+                            node.setCpuPct(cpuPct);
+                        }
+                    } catch (Exception e) {
+                        // JDK 9+ module access may block reflective getThreadCpuTime
+                        System.err.println("getThreadCpuTime FAILED: " + e);
                     }
                 }
             }

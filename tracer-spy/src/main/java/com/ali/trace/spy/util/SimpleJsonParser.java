@@ -146,18 +146,6 @@ public class SimpleJsonParser {
             node.setRealReturnType(realReturnType);
         }
 
-        // Extract capturedValue (for capturedRef nodes)
-        String capturedValue = extractStringValue(content, "capturedValue");
-        if (capturedValue != null) {
-            node.setCapturedValue(capturedValue);
-        }
-
-        // Extract capturedParamIndex (for capturedRef nodes)
-        String capturedParamIndexStr = extractStringValue(content, "capturedParamIndex");
-        if (capturedParamIndexStr != null) {
-            try { node.setCapturedParamIndex(Integer.parseInt(capturedParamIndexStr)); } catch (NumberFormatException e) { /* ignore */ }
-        }
-
         // Extract arrayLength (for array/collection results)
         String arrayLengthStr = extractStringValue(content, "arrayLength");
         if (arrayLengthStr != null) {

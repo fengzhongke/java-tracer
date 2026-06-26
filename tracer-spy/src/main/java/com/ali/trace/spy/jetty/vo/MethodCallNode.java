@@ -26,14 +26,10 @@ public class MethodCallNode {
     private String valueType;       // literal type (e.g. "int", "String", "null")
 
     // --- Call type field ---
-    private String callType;        // "method", "field", "classRef", "capturedRef", "arrayLength", "literal", "arrayGet" (default "method")
+    private String callType;        // "method", "field", "classRef", "literal", "arrayGet" (default "method")
 
     // --- Array/List index access field (used when callType is "arrayGet") ---
     private int index = -1;         // array/list index (e.g. 0, 1, 2...); -1 means not set
-
-    // --- Captured reference fields (used when callType is "capturedRef") ---
-    private String capturedValue;   // toString of the captured object (for display, truncated)
-    private int capturedParamIndex = -1; // index in BaseInterceptor.getParams() array (0=receiver, 1+=method args); -1 means not set
 
     // --- Array/Collection length field (response, set when result is array or Collection) ---
     private int arrayLength = -1;   // length of array or Collection result (-1 = not an array/collection, 0+ = actual length)
@@ -73,8 +69,7 @@ public class MethodCallNode {
     public boolean isClassRef() {
         return className != null && !className.isEmpty()
             && (methodName == null || methodName.isEmpty())
-            && !"field".equals(callType)
-            && !"capturedRef".equals(callType);
+            && !"field".equals(callType);
     }
 
     // --- Getters and setters ---
@@ -126,19 +121,9 @@ public class MethodCallNode {
     public int getIndex() { return index; }
     public void setIndex(int index) { this.index = index; }
 
-    public String getCapturedValue() { return capturedValue; }
-    public void setCapturedValue(String capturedValue) { this.capturedValue = capturedValue; }
-
-    public int getCapturedParamIndex() { return capturedParamIndex; }
-    public void setCapturedParamIndex(int capturedParamIndex) { this.capturedParamIndex = capturedParamIndex; }
-
     public int getArrayLength() { return arrayLength; }
     public void setArrayLength(int arrayLength) { this.arrayLength = arrayLength; }
 
-    /** Check if this node is a captured reference (pre-resolved object from param capture weave). */
-    public boolean isCapturedRef() {
-        return "capturedRef".equals(callType);
-    }
 
     @Override
     public String toString() {
@@ -200,14 +185,6 @@ public class MethodCallNode {
         if (index >= 0) {
             sb.append(",\"index\":").append(index);
         }
-        if (capturedValue != null) {
-            if (sb.length() > 1) sb.append(",");
-            sb.append("\"capturedValue\":\"").append(escapeJson(capturedValue)).append("\"");
-        }
-        if (capturedParamIndex >= 0) {
-            if (sb.length() > 1) sb.append(",");
-            sb.append("\"capturedParamIndex\":").append(capturedParamIndex);
-        }
         if (arrayLength >= 0) {
             if (sb.length() > 1) sb.append(",");
             sb.append("\"arrayLength\":").append(arrayLength);
@@ -267,8 +244,6 @@ public class MethodCallNode {
         copy.valueType = this.valueType;
         copy.callType = this.callType;
         copy.index = this.index;
-        copy.capturedValue = this.capturedValue;
-        copy.capturedParamIndex = this.capturedParamIndex;
         copy.arrayLength = this.arrayLength;
         copy.loaderId = this.loaderId;
         // Response fields

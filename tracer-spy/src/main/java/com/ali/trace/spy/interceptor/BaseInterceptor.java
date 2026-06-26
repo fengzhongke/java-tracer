@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.ali.trace.spy.core.ConfigPool;
 import com.ali.trace.spy.helper.IFileNameGenerator;
 import com.ali.trace.spy.helper.ThreadFileNameGenerator;
 
@@ -59,7 +60,14 @@ public abstract class BaseInterceptor implements IInterceptor {
     }
 
     public static void setParams(Object[] params) {
-        interceptParams.set(params);
+        if (params != null && params.length > 0) {
+            Object[] array = new Object[params.length + 1];
+            array[0] = ConfigPool.getPool().getParamCaptureTarget();
+            System.arraycopy(params, 0, array, 1, params.length);
+            interceptParams.set(array);
+        } else {
+            interceptParams.set(null);
+        }
     }
 
     public static Object[] getParams() {

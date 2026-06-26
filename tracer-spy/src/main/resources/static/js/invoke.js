@@ -91,25 +91,6 @@ function createClassRefStep(className, loaderId) {
     };
 }
 
-function createCapturedRefStep(className, capturedValue, capturedParamIndex) {
-    return {
-        callType: 'capturedRef',
-        className: className || '',
-        methodName: '',
-        capturedValue: capturedValue || '',
-        capturedParamIndex: capturedParamIndex >= 0 ? capturedParamIndex : 0,
-        paramTypes: '',
-        params: [],
-        isStatic: false,
-        loaderId: 0,
-        returnType: '',
-        returnValue: '',
-        isVoid: false,
-        exception: null,
-        duration: 0,
-        _returnTypeHint: ''
-    };
-}
 
 function createLiteralParam(value, valueType) {
     return {
@@ -144,6 +125,15 @@ function createSubchainParam(typeHint) {
     };
 }
 
+function createEmptyArrayParam(typeHint) {
+    return {
+        callType: 'literal',
+        value: 'empty',
+        valueType: (typeHint || 'Object[]'),
+        _paramTypeHint: typeHint || 'Object[]'
+    };
+}
+
 function createAutoParam(typeName) {
     var PRIMS = ['int','long','double','float','boolean','short','byte','char'];
     if (PRIMS.indexOf(typeName) >= 0) return createLiteralParam('', typeName);
@@ -174,15 +164,14 @@ function updateMaxDisplayLen(val) {
     var n = parseInt(val);
     if (n && n >= 60) {
         maxDisplayLen = n;
-        // Sync to backend so return values are not truncated
-        $.post('/invoke/config-max-len.json', {maxLen: String(n)});
-        // Re-render chain if there are steps with results
-        if (chainSteps.length > 0) {
-            renderChain();
-            if ($('#invoke_result').is(':visible')) {
-                showChainResult();
+        $.post('/invoke/config-max-len.json', {maxLen: String(n)}, function() {
+            // Backend maxLen updated — re-invoke to get fresh (un-truncated) results
+            if (chainSteps.length > 0 && $('#invoke_result').is(':visible')) {
+                invokeChain();
+            } else {
+                renderChain();
             }
-        }
+        });
     }
 }
 
@@ -474,7 +463,6 @@ function renderStep(step, index, parentPathPrefix) {
     var cssClass = 'chain-step';
     if (step.callType === 'field') cssClass += ' step-field';
     else if (step.callType === 'classRef') cssClass += ' step-classref';
-    else if (step.callType === 'capturedRef') cssClass += ' step-capturedref';
     else if (step.callType === 'arrayGet') cssClass += ' step-arrayget';
     else if (step.isStatic) cssClass += ' step-static';
     else cssClass += ' step-method';
@@ -497,8 +485,6 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">Class</button>';
-        } else if (step.callType === 'capturedRef') {
-            html += '<button class="type-badge badge-capturedref" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">captured</button>';
         } else if (step.callType === 'arrayGet') {
             html += '<button class="type-badge badge-arrayget" onclick="invokeChainUpTo(' + index + ')" title="Invoke up to here">[' + step.index + ']</button>';
         } else {
@@ -512,8 +498,6 @@ function renderStep(step, index, parentPathPrefix) {
             if (step.isStatic) html += '<span class="type-badge badge-static">static</span>';
         } else if (step.callType === 'classRef') {
             html += '<button class="type-badge badge-classref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">Class</button>';
-        } else if (step.callType === 'capturedRef') {
-            html += '<button class="type-badge badge-capturedref" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">captured</button>';
         } else if (step.callType === 'arrayGet') {
             html += '<button class="type-badge badge-arrayget" onclick="invokeSubChain(\'' + parentPathPrefix + '\')" title="Invoke sub-chain">[' + step.index + ']</button>';
         } else {
@@ -524,9 +508,6 @@ function renderStep(step, index, parentPathPrefix) {
     html += '<span class="step-name">';
     if (step.callType === 'classRef') {
         html += escapeHtml(shortClassName(step.className)) + '.class';
-    } else if (step.callType === 'capturedRef') {
-        html += '<span style="color:#f0ad4e;font-weight:bold;">this</span> ';
-        html += '<span style="color:#999;font-size:11px;">(' + escapeHtml(shortClassName(step.className)) + ': ' + escapeHtml(truncate(step.capturedValue, 40)) + ')</span>';
     } else if (step.callType === 'arrayGet') {
         html += '[' + step.index + ']';
     } else if (step.className) {
@@ -555,9 +536,8 @@ function renderStep(step, index, parentPathPrefix) {
     if (step.callType === 'method' && step.params && step.params.length > 0) {
         html += '<div class="step-params">';
         for (var p = 0; p < step.params.length; p++) {
-            if (p > 0) html += '<span class="param-sep">,</span>';
             var paramPath = pathPrefix + ':' + p;
-            html += renderParamInline(step, p, paramPath);
+            html += renderParamEditor(step, p, paramPath);
         }
         html += '</div>';
     }
@@ -607,72 +587,71 @@ function renderStep(step, index, parentPathPrefix) {
     return html;
 }
 
-function renderParamInline(step, paramIndex, paramPath) {
-    var param = step.params[paramIndex];
-    var typeHint = param._paramTypeHint || getParamTypeHint(step, paramIndex) || '';
-    var isPrim = isPrimitiveType(typeHint) && typeHint !== 'void';
-    var canSub = canUseSubchain(typeHint);
-
-    var html = '<span class="param-inline">';
-    html += '<span class="param-type-label">' + escapeHtml(shortClassName(typeHint)) + '</span>';
-
-    // Mode tabs — always show null; value for prim/string; chain for object types
-    html += '<span class="param-tab-null' + (param.callType === 'null' ? ' active' : '') + '" onclick="switchParamMode(\'' + paramPath + '\',\'null\')">null</span>';
-    if (isPrim || typeHint === 'String') {
-        html += '<span class="param-tab-value' + (param.callType === 'literal' ? ' active' : '') + '" onclick="switchParamMode(\'' + paramPath + '\',\'literal\')">value</span>';
-    }
-    if (canSub) {
-        html += '<span class="param-tab-chain' + (param.callType === 'subchain' ? ' active' : '') + '" onclick="toggleChainParam(\'' + paramPath + '\')">chain</span>';
-    }
-
-    // Show current value inline
-    if (param.callType === 'literal') {
-        html += ' <input type="text" class="form-control input-sm param-value-input" value="' + escapeAttr(param.value) + '" onchange="updateParamValue(\'' + paramPath + '\',this.value)" placeholder="' + escapeHtml(param.valueType) + ' value">';
-    } else if (param.callType === 'classRef') {
-        html += ' <span class="param-val-classref">' + escapeHtml(shortClassName(param.className)) + '.class</span>';
-    } else if (param.callType === 'subchain') {
-        // No inline text — sub-chain panel below shows the detail
-    }
-
-    html += '</span>';
-    return html;
-}
-
 function renderParamEditor(step, paramIndex, paramPath) {
     var param = step.params[paramIndex];
     var typeHint = param._paramTypeHint || getParamTypeHint(step, paramIndex) || '';
-    var html = '';
-
-    // Mode selector buttons
-    html += '<div class="param-editor-row">';
-    html += '<span class="param-type-label" style="min-width:60px;">' + escapeHtml(typeHint) + '</span>';
-
     var isPrim = isPrimitiveType(typeHint) && typeHint !== 'void';
     var canSub = canUseSubchain(typeHint);
+    var isObj = !isPrim && typeHint !== 'String' && !isArrayOrListType(typeHint) && typeHint !== 'void' && typeHint !== '';
+    var isArr = isArrayOrListType(typeHint);
 
-    if (isPrim || typeHint === 'String') {
-        html += '<button class="btn btn-xs ' + (param.callType === 'literal' ? 'btn-success' : 'btn-default') + '" onclick="switchParamMode(\'' + paramPath + '\',\'literal\')">value</button>';
+    // Determine current dropdown value
+    var currentMode = param.callType || 'method';
+    var selectVal = currentMode;
+    if (currentMode === 'literal') {
+        // Distinguish: literal with String valueType on Object → 'stringLiteral'
+        // literal with 'empty' value on array type → 'emptyArray'
+        // literal otherwise → 'literal' (for primitives/String)
+        if (param.value === 'empty' && isArr) {
+            selectVal = 'emptyArray';
+        } else if (param.valueType === 'String' && isObj) {
+            selectVal = 'stringLiteral';
+        } else {
+            selectVal = 'literal';
+        }
     }
-    html += '<button class="btn btn-xs ' + (param.callType === 'null' ? 'btn-primary' : 'btn-default') + '" onclick="switchParamMode(\'' + paramPath + '\',\'null\')">null</button>';
-    if (canSub) {
-        html += '<button class="btn btn-xs ' + (param.callType === 'subchain' ? 'btn-warning' : 'btn-default') + '" onclick="switchParamMode(\'' + paramPath + '\',\'subchain\')">chain</button>';
+    if (currentMode === 'classRef') selectVal = 'literal';
+    if (currentMode === 'method' || currentMode === 'field') selectVal = 'null';
+
+    var html = '<div class="param-editor-row">';
+    html += '<span class="param-type-label">' + escapeHtml(shortClassName(typeHint)) + '</span>';
+
+    html += '<select class="param-mode-select" onchange="switchParamMode(\'' + paramPath + '\',this.value)">';
+    html += '<option value="null"' + (selectVal === 'null' ? ' selected' : '') + '>null</option>';
+    if (isPrim || typeHint === 'String') {
+        html += '<option value="literal"' + (selectVal === 'literal' ? ' selected' : '') + '>value</option>';
+    }
+    if (isObj) {
+        html += '<option value="stringLiteral"' + (selectVal === 'stringLiteral' ? ' selected' : '') + '>String</option>';
+        html += '<option value="subchain"' + (selectVal === 'subchain' ? ' selected' : '') + '>chain</option>';
+    }
+    if (isArr) {
+        html += '<option value="emptyArray"' + (selectVal === 'emptyArray' ? ' selected' : '') + '>empty</option>';
+        html += '<option value="subchain"' + (selectVal === 'subchain' ? ' selected' : '') + '>chain</option>';
+    }
+    html += '</select>';
+
+    // Inline content for current mode
+    if (currentMode === 'literal') {
+        if (param.value === 'empty' && isArr) {
+            html += ' <span style="color:#999;">empty ' + escapeHtml(shortClassName(typeHint)) + '</span>';
+        } else {
+            html += ' <input type="text" class="form-control input-sm param-value-input" value="' + escapeAttr(param.value) + '" onchange="updateParamValue(\'' + paramPath + '\',this.value)" placeholder="' + escapeHtml(param.valueType) + '">';
+        }
+    } else if (currentMode === 'classRef') {
+        html += ' <span class="param-val-classref">' + escapeHtml(shortClassName(param.className)) + '.class</span>';
     }
 
     html += '</div>';
 
-    // Mode-specific content
-    if (param.callType === 'literal') {
-        html += '<div class="param-editor-row" style="margin-top:4px;">';
-        html += '<input type="text" class="form-control input-sm" style="width:150px;" value="' + escapeAttr(param.value) + '" onchange="updateParamValue(\'' + paramPath + '\',this.value)" placeholder="' + escapeHtml(param.valueType) + ' value">';
-        html += '</div>';
-    } else if (param.callType === 'null') {
-        html += '<div style="color:#999;font-size:12px;margin-top:4px;">Passes null</div>';
-    } else if (param.callType === 'subchain') {
-        html += renderSubchain(param, paramPath);
+    // Expanded content below for certain modes
+    if (currentMode === 'null') {
+        html += '<div class="param-editor-content" style="color:#999;">Passes null</div>';
     }
 
     return html;
 }
+
 
 function renderSubchain(param, paramPath) {
     // paramPath points to this sub-chain param itself.
@@ -906,14 +885,18 @@ function switchParamMode(paramPath, newMode) {
         var valueType = typeHint;
         if (!isPrimitiveType(valueType) && valueType !== 'String') valueType = 'String';
         replaceParamByPath(paramPath, createLiteralParam('', valueType));
+    } else if (newMode === 'stringLiteral') {
+        replaceParamByPath(paramPath, createLiteralParam('', 'String'));
     } else if (newMode === 'subchain') {
         replaceParamByPath(paramPath, createSubchainParam(typeHint));
+    } else if (newMode === 'emptyArray') {
+        replaceParamByPath(paramPath, createEmptyArrayParam(typeHint));
     }
 
     if (newMode === 'subchain') {
         expandedEditors[paramPath] = true;  // auto-expand sub-chain
     } else {
-        delete expandedEditors[paramPath];  // no editor needed for null/literal (inline)
+        delete expandedEditors[paramPath];
     }
     clearAllResults();
     renderChain();
@@ -1541,10 +1524,6 @@ function cloneStepForSerialization(step) {
     node.className = step.className || '';
     if (step.methodName) node.methodName = step.methodName;
     if (step.index >= 0) node.index = step.index;
-    if (step.callType === 'capturedRef') {
-        node.capturedValue = step.capturedValue || '';
-        node.capturedParamIndex = step.capturedParamIndex >= 0 ? step.capturedParamIndex : 0;
-    }
     var pt = normalizeParamTypes(step.paramTypes);
     if (pt && pt.trim()) {
         node.paramTypes = pt.split(',').map(function(s) { return s.trim(); });
@@ -1567,9 +1546,6 @@ function serializeParam(param) {
     }
     if (param.callType === 'classRef') {
         return { className: param.className || '', callType: 'classRef', loaderId: param.loaderId || 0 };
-    }
-    if (param.callType === 'capturedRef') {
-        return { className: param.className || '', callType: 'capturedRef', capturedValue: param.capturedValue || '', capturedParamIndex: param.capturedParamIndex >= 0 ? param.capturedParamIndex : 0 };
     }
     if (param.callType === 'subchain') {
         var subSteps = param.subSteps || [];
@@ -1637,8 +1613,6 @@ function convertParamsFromTree(step) {
             param._paramTypeHint = param.valueType || '';
         } else if (param.callType === 'classRef') {
             param._paramTypeHint = 'Class';
-        } else if (param.callType === 'capturedRef') {
-            param._paramTypeHint = param.className || '';
         } else if (param.callType === 'null') {
             param._paramTypeHint = '';
         } else if (param.callType === 'method' || param.callType === 'field' || (param.className && !param.callType)) {
@@ -1694,8 +1668,6 @@ function mergeResponseToStep(model, resp) {
     model.isVoid = resp.isVoid !== undefined ? resp.isVoid : false;
     model.duration = resp.duration !== undefined ? resp.duration : 0;
     if (resp.arrayLength !== undefined && resp.arrayLength >= 0) model.arrayLength = resp.arrayLength;
-    if (resp.capturedValue) model.capturedValue = resp.capturedValue;
-    if (resp.capturedParamIndex !== undefined && resp.capturedParamIndex >= 0) model.capturedParamIndex = resp.capturedParamIndex;
     if (!model._returnTypeHint && resp.returnType) model._returnTypeHint = resp.returnType;
     // realReturnType gives the full runtime class name — use it for next-step resolution
     if (resp.realReturnType) model.realReturnType = resp.realReturnType;
@@ -1829,10 +1801,6 @@ function restoreWeaveState() {
                 if (data.capturedParams && data.capturedParams.length > 0) {
                     renderCapturedParams(data.capturedParams);
                 }
-                // Auto-populate chain from weave if chain is empty
-                if (chainSteps.length === 0 && data.capturedParams && data.capturedParams.length > 0) {
-                    autoPopulateChainFromWeave();
-                }
             } else {
                 $('#weave_status').html('No weave target set');
                 $('#unweave_btn').hide();
@@ -1841,22 +1809,12 @@ function restoreWeaveState() {
     });
 }
 
-function autoPopulateChainFromWeave() {
-    $.get('/invoke/weave-chain.json', function(str) {
-        var ret;
-        try { ret = JSON.parse(str); } catch(e) { return; }
-        if (ret.status && ret.data) {
-            // Deserialize the tree into chainSteps[]
-            deserializeFromResponse(ret.data);
-            renderChain();
-        }
-    });
-}
 
 function renderCapturedParams(params) {
     if (!params || params.length === 0) {
         $('#weave_captured_params').html('No captured params yet — call the weaved method first');
         $('#use_params_btn').hide();
+        $('#clear_params_btn').hide();
         return;
     }
     var html = '<b>Captured params:</b> ';
@@ -1875,6 +1833,7 @@ function renderCapturedParams(params) {
     }
     $('#weave_captured_params').html(html);
     $('#use_params_btn').show();
+    $('#clear_params_btn').show();
 }
 
 function showWeaveModal() {
@@ -2023,24 +1982,53 @@ function refreshCapturedParams() {
     });
 }
 
-function useCapturedParamsAsInvoke() {
-    // Directly invoke the weaved method using captured params via invokeCapture,
-    // then populate chain editor with the result so user can continue chaining.
-    $.get('/invoke/exec-capture.json', function(str) {
-        var ret;
-        try { ret = JSON.parse(str); } catch(e) { alert('Invalid response'); return; }
-        if (ret.status && ret.data) {
-            chainSteps = [];  // Clear existing chain
-            deserializeFromResponse(ret.data);
-            renderChain();
-            showChainResult();
-        } else {
-            $('#invoke_result').show();
-            $('#result_container').html('<div style="color:#a94442;padding:8px;">' + escapeHtml(ret.msg || 'unknown error') + '</div>');
+function clearCapturedParams() {
+    $.post('/invoke/clear-params.json', function(str) {
+        var ret = JSON.parse(str);
+        if (ret.status) {
+            $('#weave_captured_params').html('Params cleared');
+            $('#use_params_btn').hide();
+            $('#clear_params_btn').hide();
         }
-    }).fail(function(xhr) {
-        alert('HTTP error: ' + xhr.status);
     });
+}
+
+function useCapturedParamsAsInvoke() {
+    // Build a chain: InvokeHandler.invokeCapture(BaseInterceptor.getParams())
+    // Fill the chain editor with this structure so the user can review and invoke manually.
+    chainSteps = [];
+    expandedEditors = {};
+
+    // Main step: InvokeHandler.invokeCapture(Object[]) — static method
+    var invokeStep = createMethodStep(
+        'com.ali.trace.spy.jetty.handler.InvokeHandler',
+        'invokeCapture',
+        'Object[]',
+        true,  // static
+        1      // loaderId
+    );
+    invokeStep._returnTypeHint = 'Object';
+
+    // Param: BaseInterceptor.getParams() — static method, returns Object[]
+    // Represented as a sub-chain (1 step inside)
+    var getParamsSubchain = createSubchainParam('Object[]');
+    var getParamsStep = createMethodStep(
+        'com.ali.trace.spy.interceptor.BaseInterceptor',
+        'getParams',
+        '',
+        true,  // static
+        1      // loaderId
+    );
+    getParamsStep._returnTypeHint = 'Object[]';
+    getParamsSubchain.subSteps = [getParamsStep];
+    getParamsSubchain._paramTypeHint = 'Object[]';
+
+    invokeStep.params = [getParamsSubchain];
+    expandedEditors['0:0'] = true;  // Expand the sub-chain editor
+
+    chainSteps.push(invokeStep);
+    clearAllResults();
+    renderChain();
 }
 
 // =============================================
