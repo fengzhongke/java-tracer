@@ -50,6 +50,7 @@ public class ConfigPool {
     private volatile int progressDone = 0;
     private volatile int progressFailed = 0;
     private volatile String progressStatus = "idle"; // idle, running, complete
+    private volatile boolean invokeCallAllowed = true;  // default true for backward compat
 
     public static ConfigPool getPool() {
         return INSTANCE;
@@ -65,6 +66,7 @@ public class ConfigPool {
         weaveClass = null;
         inst = null;
         injector = null;
+        invokeCallAllowed = true;  // reset to default on clear/hot-reload
         SEQ_SEED.set(0);
     }
 
@@ -242,13 +244,17 @@ public class ConfigPool {
         }
 
         // Collect classes that need retransform across all loaders
+        // Normalize the prefix so "com/ali/dts" becomes "com/ali/dts/" —
+        // avoids matching unintended sub-packages like "com/ali/dtsmanager"
+        final String normalizedPrefix = prefix.equals("*") ? prefix :
+            (prefix.endsWith("/") ? prefix : prefix + "/");
         final List<LoaderSet> allLoaders = getAllLoadedClasses();
         final List<RedefineTask> tasks = new ArrayList<>();
         for (LoaderSet loaderSet : allLoaders) {
             ClassLoader loader = loaderSet.getLoader();
             for (Map.Entry<String, Integer> entry : loaderSet.classNames.entrySet()) {
                 String name = entry.getKey();
-                if (name.startsWith(prefix) || prefix.equalsIgnoreCase("*")) {
+                if (name.startsWith(normalizedPrefix) || prefix.equalsIgnoreCase("*")) {
                     boolean shouldWeave = !injector.filter(name);
                     int currentType = entry.getValue();
                     if (shouldWeave && currentType == 0) {
@@ -496,6 +502,14 @@ public class ConfigPool {
             }
         }
         return del;
+    }
+
+    public void setInvokeCallAllowed(boolean allowed) {
+        this.invokeCallAllowed = allowed;
+    }
+
+    public boolean isInvokeCallAllowed() {
+        return invokeCallAllowed;
     }
 
     public IInterceptor getInterceptor() {

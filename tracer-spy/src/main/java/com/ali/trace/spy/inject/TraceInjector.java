@@ -56,7 +56,7 @@ public class TraceInjector {
 
     private List<String> redefinedNames = new ArrayList<>();
 
-    public TraceInjector(Instrumentation inst, Class<?> clasz, int port, int mode)
+    public TraceInjector(Instrumentation inst, Class<?> clasz, int port, int mode, int invokeCall)
         throws NoSuchMethodException, SecurityException {
         LOADER = getClass().getClassLoader();
         TYPE_NAME = clasz.getName().replace(".", "/");
@@ -68,6 +68,7 @@ public class TraceInjector {
         POOL.setInst(inst, this);
         POOL.setWeaveClass(clasz);
         NodePool.getPool().setMode(mode);
+        POOL.setInvokeCallAllowed(invokeCall != 0);
         initPrefix();
 
         // Update Velocity to use current ClassLoader (for hot reload)
@@ -154,7 +155,7 @@ public class TraceInjector {
             } else if (line.contains("exclude:")) {
                 parts = excludes;
             } else if (parts != null && StringUtils.isNotBlank(line.trim())) {
-                parts.add(line.trim());
+                parts.add(normalizePrefix(line.trim()));
             }
         }
         includes.forEach(prefix -> System.out.println("include: parts[" + prefix + "]"));
@@ -178,38 +179,59 @@ public class TraceInjector {
 
     /**
      * Add a prefix to include list. Creates new HashSet to maintain volatile semantics.
+     * Package prefixes are normalized to end with "/" to avoid matching unintended
+     * sub-packages (e.g., "com/ali/dts" won't accidentally match "com/ali/dtsmanager").
      */
     public void addIncludePrefix(String prefix) {
         Set<String> newSet = new HashSet<>(includePrefix);
-        newSet.add(prefix);
+        newSet.add(normalizePrefix(prefix));
         includePrefix = newSet;
 }
 
     /**
      * Remove a prefix from include list. Creates new HashSet to maintain volatile semantics.
+     * Normalizes the prefix the same way as addIncludePrefix for consistent removal.
      */
     public void removeIncludePrefix(String prefix) {
         Set<String> newSet = new HashSet<>(includePrefix);
-        newSet.remove(prefix);
+        newSet.remove(normalizePrefix(prefix));
         includePrefix = newSet;
     }
 
     /**
      * Add a prefix to exclude list. Creates new HashSet to maintain volatile semantics.
+     * Package prefixes are normalized to end with "/" to avoid matching unintended
+     * sub-packages (e.g., "com/ali/dts" won't accidentally match "com/ali/dtsmanager").
      */
     public void addExcludePrefix(String prefix) {
         Set<String> newSet = new HashSet<>(excludePrefix);
-        newSet.add(prefix);
+        newSet.add(normalizePrefix(prefix));
         excludePrefix = newSet;
     }
 
     /**
      * Remove a prefix from exclude list. Creates new HashSet to maintain volatile semantics.
+     * Normalizes the prefix the same way as addExcludePrefix for consistent removal.
      */
     public void removeExcludePrefix(String prefix) {
         Set<String> newSet = new HashSet<>(excludePrefix);
-        newSet.remove(prefix);
+        newSet.remove(normalizePrefix(prefix));
         excludePrefix = newSet;
+    }
+
+    /**
+     * Normalize a prefix for package-level matching.
+     * If the prefix doesn't already end with "/" and isn't the wildcard "*",
+     * append "/" so that "com/ali/dts" becomes "com/ali/dts/" — this prevents
+     * false matches on sibling packages like "com/ali/dtsmanager".
+     * Class-level prefixes (e.g., "com/ali/dts/Service") already contain "/"
+     * after the package part and are left unchanged.
+     */
+    private String normalizePrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty() || prefix.equals("*") || prefix.endsWith("/")) {
+            return prefix;
+        }
+        return prefix + "/";
     }
 
     /**

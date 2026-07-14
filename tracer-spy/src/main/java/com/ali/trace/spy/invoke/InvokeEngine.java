@@ -302,6 +302,14 @@ public class InvokeEngine {
             return node;
         }
 
+        // --- invokeCall gate: block method invocation when disabled ---
+        if (!ConfigPool.getPool().isInvokeCallAllowed()) {
+            node.setException("method invocation is disabled (invokeCall=false)");
+            node.setDuration(0);
+            node.resolvedValue = null;
+            return node;
+        }
+
         // Step 1: Evaluate target (instance method receiver)
         Object receiver = null;
         if (node.getTarget() != null) {

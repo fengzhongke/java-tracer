@@ -40,6 +40,7 @@ public class InvokeHandler implements ITraceHttpHandler {
     @TraceView
     public String index(ModelMap map) {
         map.put("activePage", "invoke");
+        map.put("invokeCallAllowed", ConfigPool.getPool().isInvokeCallAllowed());
         return "invoke";
     }
 
@@ -156,29 +157,33 @@ public class InvokeHandler implements ITraceHttpHandler {
         List<MemberMetaVO> membersList = new ArrayList<MemberMetaVO>();
         Set<String> seen = new HashSet<String>();
         Class<?> originalClazz = clazz;
+        boolean invokeCallAllowed = ConfigPool.getPool().isInvokeCallAllowed();
 
         // Walk superclass chain
         while (clazz != null) {
             // Collect declared methods (includes private/protected, no inherited)
-            for (Method m : clazz.getDeclaredMethods()) {
-                String sig = buildSignature(m);
-                if (seen.contains(sig)) continue;
-                seen.add(sig);
+            // — skip when invokeCall=false
+            if (invokeCallAllowed) {
+                for (Method m : clazz.getDeclaredMethods()) {
+                    String sig = buildSignature(m);
+                    if (seen.contains(sig)) continue;
+                    seen.add(sig);
 
-                MemberMetaVO vo = new MemberMetaVO();
-                vo.setName(m.getName());
-                vo.setReturnType(m.getReturnType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                vo.setField(false);
-                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+                    MemberMetaVO vo = new MemberMetaVO();
+                    vo.setName(m.getName());
+                    vo.setReturnType(m.getReturnType().getSimpleName());
+                    vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                    vo.setField(false);
+                    vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
 
-                Class<?>[] paramTypes = m.getParameterTypes();
-                String[] paramTypeNames = new String[paramTypes.length];
-                for (int i = 0; i < paramTypes.length; i++) {
-                    paramTypeNames[i] = paramTypes[i].getSimpleName();
+                    Class<?>[] paramTypes = m.getParameterTypes();
+                    String[] paramTypeNames = new String[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        paramTypeNames[i] = paramTypes[i].getSimpleName();
+                    }
+                    vo.setParamTypes(paramTypeNames);
+                    membersList.add(vo);
                 }
-                vo.setParamTypes(paramTypeNames);
-                membersList.add(vo);
             }
 
             // Collect declared fields (includes private/protected)
@@ -200,25 +205,28 @@ public class InvokeHandler implements ITraceHttpHandler {
         }
 
         // Interface methods (public methods including interface defaults)
-        for (Method m : originalClazz.getMethods()) {
-            String sig = buildSignature(m);
-            if (seen.contains(sig)) continue;
-            seen.add(sig);
+        // — skip when invokeCall=false
+        if (invokeCallAllowed) {
+            for (Method m : originalClazz.getMethods()) {
+                String sig = buildSignature(m);
+                if (seen.contains(sig)) continue;
+                seen.add(sig);
 
-            MemberMetaVO vo = new MemberMetaVO();
-            vo.setName(m.getName());
-            vo.setReturnType(m.getReturnType().getSimpleName());
-            vo.setStatic(Modifier.isStatic(m.getModifiers()));
-            vo.setField(false);
-            vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+                MemberMetaVO vo = new MemberMetaVO();
+                vo.setName(m.getName());
+                vo.setReturnType(m.getReturnType().getSimpleName());
+                vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                vo.setField(false);
+                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
 
-            Class<?>[] paramTypes = m.getParameterTypes();
-            String[] paramTypeNames = new String[paramTypes.length];
-            for (int i = 0; i < paramTypes.length; i++) {
-                paramTypeNames[i] = paramTypes[i].getSimpleName();
+                Class<?>[] paramTypes = m.getParameterTypes();
+                String[] paramTypeNames = new String[paramTypes.length];
+                for (int i = 0; i < paramTypes.length; i++) {
+                    paramTypeNames[i] = paramTypes[i].getSimpleName();
+                }
+                vo.setParamTypes(paramTypeNames);
+                membersList.add(vo);
             }
-            vo.setParamTypes(paramTypeNames);
-            membersList.add(vo);
         }
 
         return membersList;
@@ -274,7 +282,8 @@ public class InvokeHandler implements ITraceHttpHandler {
                 clazz = clazz.getSuperclass();
             }
 
-            DataRet<List<MethodMetaVO>> ret = new DataRet<List<MethodMetaVO>>(true, 0, "ok");
+            DataRet<List<MethodMetaVO>> ret = new DataRet<List<MethodMetaVO>>(true, 0,
+                ConfigPool.getPool().isInvokeCallAllowed() ? "ok" : "ok:invokeCall=false");
             ret.setData(methodsList);
             return ret;
 
@@ -444,33 +453,37 @@ public class InvokeHandler implements ITraceHttpHandler {
             List<MemberMetaVO> membersList = new ArrayList<MemberMetaVO>();
             Set<String> seen = new HashSet<String>(); // deduplicate by name+signature
             Class<?> originalClazz = clazz;
+            boolean invokeCallAllowed = ConfigPool.getPool().isInvokeCallAllowed();
 
             // Walk superclass chain, but stop at Object (exclude Object's methods)
             while (clazz != null && !clazz.equals(Object.class)) {
                 // Collect declared methods (includes private/protected, no inherited)
-                for (Method m : clazz.getDeclaredMethods()) {
-                    String sig = buildSignature(m);
-                    if (seen.contains(sig)) continue;
-                    seen.add(sig);
+                // — skip when invokeCall=false
+                if (invokeCallAllowed) {
+                    for (Method m : clazz.getDeclaredMethods()) {
+                        String sig = buildSignature(m);
+                        if (seen.contains(sig)) continue;
+                        seen.add(sig);
 
-                    MemberMetaVO vo = new MemberMetaVO();
-                    vo.setName(m.getName());
-                    vo.setReturnType(m.getReturnType().getSimpleName());
-                    vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                    vo.setField(false);
-                    vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+                        MemberMetaVO vo = new MemberMetaVO();
+                        vo.setName(m.getName());
+                        vo.setReturnType(m.getReturnType().getSimpleName());
+                        vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                        vo.setField(false);
+                        vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
 
-                    Class<?>[] paramTypes = m.getParameterTypes();
-                    String[] paramTypeNames = new String[paramTypes.length];
-                    String[] paramTypeFqnNames = new String[paramTypes.length];
-                    for (int i = 0; i < paramTypes.length; i++) {
-                        paramTypeNames[i] = paramTypes[i].getSimpleName();
-                        paramTypeFqnNames[i] = paramTypes[i].getName();
+                        Class<?>[] paramTypes = m.getParameterTypes();
+                        String[] paramTypeNames = new String[paramTypes.length];
+                        String[] paramTypeFqnNames = new String[paramTypes.length];
+                        for (int i = 0; i < paramTypes.length; i++) {
+                            paramTypeNames[i] = paramTypes[i].getSimpleName();
+                            paramTypeFqnNames[i] = paramTypes[i].getName();
+                        }
+                        vo.setParamTypes(paramTypeNames);
+                        vo.setParamTypeFqns(paramTypeFqnNames);
+
+                        membersList.add(vo);
                     }
-                    vo.setParamTypes(paramTypeNames);
-                    vo.setParamTypeFqns(paramTypeFqnNames);
-
-                    membersList.add(vo);
                 }
 
                 // Collect fields (declared fields — includes private/protected)
@@ -495,30 +508,33 @@ public class InvokeHandler implements ITraceHttpHandler {
 
             // Also include public methods from interfaces that the class implements.
             // Exclude methods declared by Object.class (equals, hashCode, toString, etc.)
-            for (Method m : originalClazz.getMethods()) {
-                if (m.getDeclaringClass().equals(Object.class)) continue;
-                String sig = buildSignature(m);
-                if (seen.contains(sig)) continue;
-                seen.add(sig);
+            // — skip when invokeCall=false
+            if (invokeCallAllowed) {
+                for (Method m : originalClazz.getMethods()) {
+                    if (m.getDeclaringClass().equals(Object.class)) continue;
+                    String sig = buildSignature(m);
+                    if (seen.contains(sig)) continue;
+                    seen.add(sig);
 
-                MemberMetaVO vo = new MemberMetaVO();
-                vo.setName(m.getName());
-                vo.setReturnType(m.getReturnType().getSimpleName());
-                vo.setStatic(Modifier.isStatic(m.getModifiers()));
-                vo.setField(false);
-                vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
+                    MemberMetaVO vo = new MemberMetaVO();
+                    vo.setName(m.getName());
+                    vo.setReturnType(m.getReturnType().getSimpleName());
+                    vo.setStatic(Modifier.isStatic(m.getModifiers()));
+                    vo.setField(false);
+                    vo.setDeclaringClass(m.getDeclaringClass().getSimpleName());
 
-                Class<?>[] paramTypes = m.getParameterTypes();
-                String[] paramTypeNames = new String[paramTypes.length];
-                String[] paramTypeFqnNames = new String[paramTypes.length];
-                for (int i = 0; i < paramTypes.length; i++) {
-                    paramTypeNames[i] = paramTypes[i].getSimpleName();
-                    paramTypeFqnNames[i] = paramTypes[i].getName();
+                    Class<?>[] paramTypes = m.getParameterTypes();
+                    String[] paramTypeNames = new String[paramTypes.length];
+                    String[] paramTypeFqnNames = new String[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        paramTypeNames[i] = paramTypes[i].getSimpleName();
+                        paramTypeFqnNames[i] = paramTypes[i].getName();
+                    }
+                    vo.setParamTypes(paramTypeNames);
+                    vo.setParamTypeFqns(paramTypeFqnNames);
+
+                    membersList.add(vo);
                 }
-                vo.setParamTypes(paramTypeNames);
-                vo.setParamTypeFqns(paramTypeFqnNames);
-
-                membersList.add(vo);
             }
 
             DataRet<List<MemberMetaVO>> ret = new DataRet<List<MemberMetaVO>>(true, 0, "ok");

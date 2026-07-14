@@ -48,6 +48,7 @@ public class Premain {
     private static final String CONFIG_PID = "-pid";
     private static final String CONFIG_RETRANSFORM = "-retransform";
     private static final String CONFIG_JDKLIB = "-jdklib";
+    private static final String CONFIG_INVOKE_CALL = "-invokeCall";
     private static SpyClassLoader LOADER = new SpyClassLoader((ClassLoader)null);
     private static final AtomicReference<Object> INJECT = new AtomicReference();
     private static volatile Instrumentation instrumentation;
@@ -59,9 +60,10 @@ public class Premain {
         int port = parsePort(configs);
         long sleep = parseSleep(configs);
         int mode = parseMode(configs);
+        int invokeCall = parseInvokeCall(configs);
         System.out.println("init trace agent with port [" + port + "] and sleep [" + sleep + "]");
         System.out.println("pages can be found in http://127.0.0.1:" + port);
-        Object inject = loadSpyJar(inst, port, mode, false);
+        Object inject = loadSpyJar(inst, port, mode, invokeCall, false);
 
         try {
             if (inject == null) {
@@ -84,11 +86,12 @@ public class Premain {
         int port = parsePort(configs);
         long sleep = parseSleep(configs);
         int mode = parseMode(configs);
+        int invokeCall = parseInvokeCall(configs);
         boolean reload = parseReload(configs);
         boolean retransform = parseRetransform(configs);
-        System.out.println("attach trace agent with port [" + port + "] mode [" + mode + "] reload [" + reload + "] retransform [" + retransform + "]");
+        System.out.println("attach trace agent with port [" + port + "] mode [" + mode + "] invokeCall [" + invokeCall + "] reload [" + reload + "] retransform [" + retransform + "]");
         System.out.println("pages can be found in http://127.0.0.1:" + port);
-        Object inject = loadSpyJar(inst, port, mode, reload);
+        Object inject = loadSpyJar(inst, port, mode, invokeCall, reload);
 
         try {
             if (inject == null) {
@@ -182,6 +185,12 @@ public class Premain {
     private static boolean parseReload(Map<String, String> configs) {
         String reloadStr = (String)configs.get("-reload");
         return reloadStr != null && Boolean.parseBoolean(reloadStr);
+    }
+
+    private static int parseInvokeCall(Map<String, String> configs) {
+        String invokeCallStr = (String)configs.get("-invokeCall");
+        // Default 1 (true) for backward compatibility
+        return invokeCallStr != null ? (Boolean.parseBoolean(invokeCallStr) ? 1 : 0) : 1;
     }
 
     private static void shutdownOldComponents(SpyClassLoader newLoader) {
@@ -282,7 +291,7 @@ public class Premain {
         return INJECT.get() != null;
     }
 
-    private static Object loadSpyJar(Instrumentation inst, int port, int mode, boolean reload) {
+    private static Object loadSpyJar(Instrumentation inst, int port, int mode, int invokeCall, boolean reload) {
         Object inject = null;
         if (reload) {
             SpyClassLoader newLoader = new SpyClassLoader((ClassLoader)null);
@@ -326,7 +335,7 @@ public class Premain {
                         }
 
                         Class injectClass = LOADER.loadClass("com.ali.trace.spy.inject.TraceInjector");
-                        INJECT.set(inject = injectClass.getConstructor(Instrumentation.class, Class.class, Integer.TYPE, Integer.TYPE).newInstance(inst, TraceEnhance.class, port, mode));
+                        INJECT.set(inject = injectClass.getConstructor(Instrumentation.class, Class.class, Integer.TYPE, Integer.TYPE, Integer.TYPE).newInstance(inst, TraceEnhance.class, port, mode, invokeCall));
                         System.out.println("Spy module loaded successfully");
                     } catch (Throwable t) {
                         t.printStackTrace();
@@ -373,6 +382,10 @@ public class Premain {
 
                 if (params.containsKey("-retransform")) {
                     agentArgsBuilder.append(":").append("-retransform").append("=").append((String)params.get("-retransform"));
+                }
+
+                if (params.containsKey("-invokeCall")) {
+                    agentArgsBuilder.append(":").append("-invokeCall").append("=").append((String)params.get("-invokeCall"));
                 }
 
                 String agentArgs = agentArgsBuilder.toString();
@@ -428,7 +441,7 @@ public class Premain {
     }
 
     private static void printUsage() {
-        System.out.println("Usage: java -jar java-tracer.jar -pid=<pid> [-port=<port>] [-mode=<mode>] [-sleep=<ms>] [-jdklib=<version>] [-retransform=true] [-reload=true]");
+        System.out.println("Usage: java -jar java-tracer.jar -pid=<pid> [-port=<port>] [-mode=<mode>] [-sleep=<ms>] [-jdklib=<version>] [-retransform=true] [-reload=true] [-invokeCall=false]");
         System.out.println("  -pid       : Target Java process ID (required)");
         System.out.println("  -port      : Web server port (default: 18902)");
         System.out.println("  -mode      : Interceptor mode (0=default, 1=CommonThreadInterceptor, 2=CompressThreadInterceptor)");
@@ -436,6 +449,7 @@ public class Premain {
         System.out.println("  -jdklib    : JDK version for native library (auto-detected, override: 8 or 21)");
         System.out.println("  -retransform: Retransform already loaded classes (default: false)");
         System.out.println("  -reload    : Force new ClassLoader for hot reload (default: false)");
+        System.out.println("  -invokeCall : Allow method invocation via Invoke feature (default: true; set false to allow only field reads)");
         System.out.println("\nExample: java -jar java-tracer.jar -pid=12345:-port=19902:-mode=1");
         System.out.println("         java -jar java-tracer.jar -pid=12345:-port=18902:-jdklib=21");
     }
